@@ -35,6 +35,19 @@
                 {
                     "clique_size": 2,
                     "cliques": [
+                        3,
+                        2
+                    ],
+                    "potentials": [
+                        2,
+                        7,
+                        1,
+                        3
+                    ]
+                },
+                {
+                    "clique_size": 2,
+                    "cliques": [
                         0,
                         3
                     ],

@@ -57,6 +57,19 @@
                         2,
                         7
                     ]
+                },
+                {
+                    "clique_size": 2,
+                    "cliques": [
+                        0,
+                        4
+                    ],
+                    "potentials": [
+                        5,
+                        8,
+                        2,
+                        7
+                    ]
                 }
             ],
             "k value (in top k)": 2

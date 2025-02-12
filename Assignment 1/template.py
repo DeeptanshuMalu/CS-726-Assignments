@@ -88,19 +88,26 @@ class Inference:
                     if neighbors[j] not in adjlist[neighbors[i]]:
                         adjlist[neighbors[i]].append(neighbors[j])
                         adjlist[neighbors[j]].append(neighbors[i])
-                        self.adjlist[neighbors[i]].append(neighbors[j])
-                        self.adjlist[neighbors[j]].append(neighbors[i])
+                        # self.adjlist[neighbors[i]].append(neighbors[j])
+                        # self.adjlist[neighbors[j]].append(neighbors[i])
             return adjlist
 
         def chordal_graph_with_heuristic(adjlist):
             chordal_adjlist = deepcopy(adjlist)
             elimination_order = []
+            cliques = []
 
             while len(elimination_order) < len(adjlist):
                 simplicial_node = find_simplicial_vertex(chordal_adjlist)
 
                 if simplicial_node is not None:
                     elimination_order.append(simplicial_node)
+                    clique = {simplicial_node}
+                    neighbours = chordal_adjlist[simplicial_node]
+                    for neigh in neighbours:
+                        if all(neigh in chordal_adjlist[i] for i in clique):
+                            clique.add(neigh)
+                    cliques.append(clique)
                     for neighbor in chordal_adjlist[simplicial_node]:
                         chordal_adjlist[neighbor].remove(simplicial_node)
                     del chordal_adjlist[simplicial_node]
@@ -114,33 +121,30 @@ class Inference:
                         chordal_adjlist, least_degree_node
                     )
                     elimination_order.append(least_degree_node)
+                    clique = {least_degree_node}
+                    neighbours = chordal_adjlist[least_degree_node]
+                    for neigh in neighbours:
+                        if all(neigh in chordal_adjlist[i] for i in clique):
+                            clique.add(neigh)
+                    cliques.append(clique)
                     for neighbor in chordal_adjlist[least_degree_node]:
                         chordal_adjlist[neighbor].remove(least_degree_node)
                     del chordal_adjlist[least_degree_node]
 
-            return elimination_order
-
-        def find_max_cliques(elimination_order):
-            temp_adjlist = deepcopy(self.adjlist)
             max_cliques = []
-            for node in elimination_order:
-                neighbors = temp_adjlist[node]
-                clique = [node] + neighbors
+            for clique in cliques:
                 is_subset = False
                 for m_clique in max_cliques:
-                    if set(clique).issubset(set(m_clique)):
+                    if clique.issubset(m_clique):
                         is_subset = True
                         break
                 if not is_subset:
-                    clique = sorted(clique)
                     max_cliques.append(clique)
-                for neighbor in neighbors:
-                    temp_adjlist[neighbor].remove(node)
-                del temp_adjlist[node]
-            return max_cliques
 
-        elimination_order = chordal_graph_with_heuristic(self.adjlist)
-        self.max_cliques = find_max_cliques(elimination_order)
+            return elimination_order, max_cliques
+
+        elimination_order, max_cliques = chordal_graph_with_heuristic(self.adjlist)
+        self.max_cliques = max_cliques
         print("\nChordal Adjacency List:")
         for node, neighbors in self.adjlist.items():
             print(f"{node}: {neighbors}")

@@ -160,7 +160,83 @@ class Inference:
 
         Refer to the problem statement for details on junction tree construction.
         """
-        pass
+
+        def create_junction_graph(cliques):
+            junction_graph = {}
+            for i, clique1 in enumerate(cliques):
+                for j, clique2 in enumerate(cliques):
+                    if i < j:
+                        intersection = clique1.intersection(clique2)
+                        if intersection:
+                            weight = len(intersection)
+                            if tuple(clique1) not in junction_graph:
+                                junction_graph[tuple(clique1)] = []
+                            if tuple(clique2) not in junction_graph:
+                                junction_graph[tuple(clique2)] = []
+                            junction_graph[tuple(clique1)].append(
+                                (tuple(clique2), weight)
+                            )
+                            junction_graph[tuple(clique2)].append(
+                                (tuple(clique1), weight)
+                            )
+            return junction_graph
+
+        self.junction_graph = create_junction_graph(self.max_cliques)
+        print(self.junction_graph)
+
+        def make_junction_tree(junction_graph):
+            # Convert the junction graph to a list of edges suitable for Kruskal's algorithm
+            edges = []
+            for node, neighbors in junction_graph.items():
+                for neighbor, weight in neighbors:
+                    if (neighbor, node, weight) not in edges:
+                        edges.append((node, neighbor, weight))
+
+            # Sort edges by weight in descending order
+            edges.sort(key=lambda x: -x[2])
+
+            parent = {}
+            rank = {}
+
+            def find(node):
+                if parent[node] != node:
+                    parent[node] = find(parent[node])
+                return parent[node]
+
+            def union(node1, node2):
+                root1 = find(node1)
+                root2 = find(node2)
+                if root1 != root2:
+                    if rank[root1] > rank[root2]:
+                        parent[root2] = root1
+                    else:
+                        parent[root1] = root2
+                        if rank[root1] == rank[root2]:
+                            rank[root2] += 1
+
+            # Initialize the union-find structure
+            for node in junction_graph:
+                parent[node] = node
+                rank[node] = 0
+
+            max_spanning_tree = {}
+            max_weight = 0
+
+            for node1, node2, weight in edges:
+                if find(node1) != find(node2):
+                    union(node1, node2)
+                    if node1 not in max_spanning_tree:
+                        max_spanning_tree[node1] = []
+                    if node2 not in max_spanning_tree:
+                        max_spanning_tree[node2] = []
+                    max_spanning_tree[node1].append(node2)
+                    max_spanning_tree[node2].append(node1)
+                    max_weight += weight
+
+            return max_spanning_tree
+
+        self.junction_tree = make_junction_tree(self.junction_graph)
+        print(self.junction_tree)
 
     def assign_potentials_to_cliques(self):
         """

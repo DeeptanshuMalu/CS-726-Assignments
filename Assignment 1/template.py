@@ -88,8 +88,6 @@ class Inference:
                     if neighbors[j] not in adjlist[neighbors[i]]:
                         adjlist[neighbors[i]].append(neighbors[j])
                         adjlist[neighbors[j]].append(neighbors[i])
-                        # self.adjlist[neighbors[i]].append(neighbors[j])
-                        # self.adjlist[neighbors[j]].append(neighbors[i])
             return adjlist
 
         def chordal_graph_with_heuristic(adjlist):
@@ -141,14 +139,13 @@ class Inference:
                 if not is_subset:
                     max_cliques.append(clique)
 
-            return elimination_order, max_cliques
+            return max_cliques
 
-        elimination_order, max_cliques = chordal_graph_with_heuristic(self.adjlist)
+        max_cliques = chordal_graph_with_heuristic(self.adjlist)
         self.max_cliques = max_cliques
         print("\nChordal Adjacency List:")
         for node, neighbors in self.adjlist.items():
             print(f"{node}: {neighbors}")
-        print("Elimination Order:", elimination_order)
         print("Maximal Cliques:", self.max_cliques)
 
     def get_junction_tree(self):

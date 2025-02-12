@@ -1,6 +1,6 @@
 import json
 from copy import deepcopy
-
+import itertools
 
 ########################################################################
 
@@ -143,7 +143,7 @@ class Inference:
 
         max_cliques = chordal_graph_with_heuristic(self.adjlist)
         self.max_cliques = max_cliques
-        print("\nChordal Adjacency List:")
+        print("Adjacency List:")
         for node, neighbors in self.adjlist.items():
             print(f"{node}: {neighbors}")
         print("Maximal Cliques:", self.max_cliques)
@@ -182,7 +182,9 @@ class Inference:
             return junction_graph
 
         self.junction_graph = create_junction_graph(self.max_cliques)
-        print(self.junction_graph)
+        print("Junction Graph:")
+        for node, neighbors in self.junction_graph.items():
+            print(f"{node}: {neighbors}")
 
         def make_junction_tree(junction_graph):
             # Convert the junction graph to a list of edges suitable for Kruskal's algorithm
@@ -220,7 +222,6 @@ class Inference:
                 rank[node] = 0
 
             max_spanning_tree = {}
-            max_weight = 0
 
             for node1, node2, weight in edges:
                 if find(node1) != find(node2):
@@ -231,12 +232,22 @@ class Inference:
                         max_spanning_tree[node2] = []
                     max_spanning_tree[node1].append(node2)
                     max_spanning_tree[node2].append(node1)
-                    max_weight += weight
 
             return max_spanning_tree
+        
+        # p = {
+        #     "abc": [("cde", 1), ("acf", 2),("agf",1)],
+        #     "acf": [("abc", 2), ("cde", 1),("agf",2)],
+        #     "cde": [("abc", 1), ("acf", 1)],
+        #     "agf": [("abc", 1), ("gh", 1),("acf",2)],
+        #     "gh": [("agf", 1)]
+        # }
 
         self.junction_tree = make_junction_tree(self.junction_graph)
-        print(self.junction_tree)
+        print("Junction Tree:")
+        for node, neighbors in self.junction_tree.items():
+            print(f"{node}: {neighbors}")
+        # print(make_junction_tree(p))
 
     def assign_potentials_to_cliques(self):
         """
@@ -249,7 +260,42 @@ class Inference:
 
         Refer to the sample test case for how potentials are associated with cliques.
         """
-        pass
+        max_clique_potentials = {}
+        for max_clique in self.max_cliques:
+            subset_clique_potentials = {}
+            for clique in self.clique_potentials:
+                if set(clique).issubset(max_clique):
+                    subset_clique_potentials[clique] = self.clique_potentials[clique]
+        
+            # For each possible binary assignment to variables in max_clique
+            max_clique_list = list(max_clique)
+            potential_values = []
+            
+            # Generate all possible binary combinations for variables in max_clique
+            for values in itertools.product([0, 1], repeat=len(max_clique_list)):
+                assignment = dict(zip(max_clique_list, values))
+
+                # Initialize potential for this assignment
+                potential = 1
+                
+                # Multiply potentials from all subset cliques
+                for clique, subset_clique_potential in subset_clique_potentials.items():
+                    # Get the index in potentials for this assignment
+                    idx = 0
+                    bin_index = ""
+                    for var in clique:
+                        bin_index += str(assignment[var])
+                    idx = int(bin_index, 2)
+                    potential *= subset_clique_potential[idx]
+                    
+                potential_values.append(potential)
+                
+            max_clique_potentials[tuple(max_clique)] = potential_values
+        
+        self.max_clique_potentials = max_clique_potentials
+        print("Maximal Clique Potentials:")
+        for clique, potentials in self.max_clique_potentials.items():
+            print(f"{clique}: {potentials}")
 
     def get_z_value(self):
         """
@@ -329,6 +375,6 @@ class Get_Input_and_Check_Output:
 
 
 if __name__ == "__main__":
-    evaluator = Get_Input_and_Check_Output("Sample_Testcase.json")
+    evaluator = Get_Input_and_Check_Output("Sample_Testcase copy.json")
     evaluator.get_output()
     evaluator.write_output("Sample_Testcase_Output.json")

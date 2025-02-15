@@ -34,9 +34,7 @@ class Inference:
                 adj_list[u].append(v)
                 adj_list[v].append(u)
             return adj_list
-
-        self.num_nodes = data["VariablesCount"]
-        self.num_potentials = data["Potentials_count"]
+        
         self.clique_potentials = {}
         self.edges = set()
         self.nodes = set()

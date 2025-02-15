@@ -34,7 +34,7 @@ class Inference:
                 adj_list[u].append(v)
                 adj_list[v].append(u)
             return adj_list
-        
+
         self.clique_potentials = {}
         self.edges = set()
         self.nodes = set()
@@ -141,10 +141,10 @@ class Inference:
 
         max_cliques = chordal_graph_with_heuristic(self.adjlist)
         self.max_cliques = max_cliques
-        print("Adjacency List:")
-        for node, neighbors in self.adjlist.items():
-            print(f"{node}: {neighbors}")
-        print("Maximal Cliques:", self.max_cliques)
+        # print("Adjacency List:")
+        # for node, neighbors in self.adjlist.items():
+        #     print(f"{node}: {neighbors}")
+        # print("Maximal Cliques:", self.max_cliques)
 
     def get_junction_tree(self):
         """
@@ -180,9 +180,9 @@ class Inference:
             return junction_graph
 
         self.junction_graph = create_junction_graph(self.max_cliques)
-        print("Junction Graph:")
-        for node, neighbors in self.junction_graph.items():
-            print(f"{node}: {neighbors}")
+        # print("Junction Graph:")
+        # for node, neighbors in self.junction_graph.items():
+        #     print(f"{node}: {neighbors}")
 
         def make_junction_tree(junction_graph):
             # Convert the junction graph to a list of edges suitable for Kruskal's algorithm
@@ -232,7 +232,7 @@ class Inference:
                     max_spanning_tree[node2].append(node1)
 
             return max_spanning_tree
-        
+
         # p = {
         #     "abc": [("cde", 1), ("acf", 2),("agf",1)],
         #     "acf": [("abc", 2), ("cde", 1),("agf",2)],
@@ -242,9 +242,9 @@ class Inference:
         # }
 
         self.junction_tree = make_junction_tree(self.junction_graph)
-        print("Junction Tree:")
-        for node, neighbors in self.junction_tree.items():
-            print(f"{node}: {neighbors}")
+        # print("Junction Tree:")
+        # for node, neighbors in self.junction_tree.items():
+        #     print(f"{node}: {neighbors}")
         # print(make_junction_tree(p))
 
     def assign_potentials_to_cliques(self):
@@ -264,18 +264,18 @@ class Inference:
             for clique in self.clique_potentials:
                 if set(clique).issubset(max_clique):
                     subset_clique_potentials[clique] = self.clique_potentials[clique]
-        
+
             # For each possible binary assignment to variables in max_clique
             max_clique_list = list(max_clique)
             potential_values = []
-            
+
             # Generate all possible binary combinations for variables in max_clique
             for values in itertools.product([0, 1], repeat=len(max_clique_list)):
                 assignment = dict(zip(max_clique_list, values))
 
                 # Initialize potential for this assignment
                 potential = 1
-                
+
                 # Multiply potentials from all subset cliques
                 for clique, subset_clique_potential in subset_clique_potentials.items():
                     # Get the index in potentials for this assignment
@@ -285,15 +285,15 @@ class Inference:
                         bin_index += str(assignment[var])
                     idx = int(bin_index, 2)
                     potential *= subset_clique_potential[idx]
-                    
+
                 potential_values.append(potential)
-                
+
             max_clique_potentials[tuple(max_clique)] = potential_values
-        
+
         self.max_clique_potentials = max_clique_potentials
-        print("Maximal Clique Potentials:")
-        for clique, potentials in self.max_clique_potentials.items():
-            print(f"{clique}: {potentials}")
+        # print("Maximal Clique Potentials:")
+        # for clique, potentials in self.max_clique_potentials.items():
+        #     print(f"{clique}: {potentials}")
 
     def get_z_value(self):
         """
@@ -306,7 +306,122 @@ class Inference:
 
         Refer to the problem statement for details on computing the partition function.
         """
-        pass
+
+        def create_empty_message_dict(junction_tree):
+            message_dict = {}
+            for node in junction_tree:
+                message_dict[node] = {}
+                for neighbor in junction_tree[node]:
+                    message_dict[node][neighbor] = None
+            return message_dict
+
+        def multiply_messages(potential, message, node, target):
+            potential_new = deepcopy(potential)
+            for val in itertools.product([0, 1], repeat=len(node)):
+                assignmt = dict(zip(node, val))
+                targ_idx = 0
+                for t in target:
+                    targ_idx = (targ_idx << 1) + assignmt[t]
+
+                node_idx = 0
+                for n in node:
+                    node_idx = (node_idx << 1) + assignmt[n]
+
+                potential_new[node_idx] *= message[targ_idx]
+
+            return potential_new
+
+        def condense_message(potential, node, summing_nodes, diff):
+            new_potential = []
+            for val in itertools.product([0, 1], repeat=len(summing_nodes)):
+                sum_val = 0
+                for val1 in itertools.product(
+                    [0, 1], repeat=len(node) - len(summing_nodes)
+                ):
+                    assignmt = dict(zip(summing_nodes, val))
+                    assignmt.update(dict(zip(diff, val1)))
+                    idx = 0
+                    for n in node:
+                        idx = (idx << 1) + assignmt[n]
+                    sum_val += potential[idx]
+                new_potential.append(sum_val)
+
+            return new_potential
+
+        def send_message(junc_tree, potentials, message_dict):
+            def find_leaves(junc_tree):
+                leaves = set()
+                for node in junc_tree:
+                    if len(junc_tree[node]) == 1:
+                        leaves.add(node)
+                return leaves
+
+            dynamic_mem = find_leaves(junc_tree)
+            while 1:
+                new_dynamic_mem = set()
+                for node in dynamic_mem:
+                    potn = None
+                    for target in junc_tree[node]:
+                        if message_dict[target][node] != None:
+                            mes = message_dict[target][node]
+                            potn = potentials[tuple(node)]
+                            potn = multiply_messages(potn, mes, node, set(node).intersection(target))
+
+                    for target in junc_tree[node]:
+                        if message_dict[target][node] == None:
+                            diff = set(node).difference(target)
+                            potn = potentials[tuple(node)]
+                            summing_nodes = set(node).difference(diff)
+                            message_dict[node][target] = condense_message(
+                                potn, node, summing_nodes, diff
+                            )
+                            new_dynamic_mem.add(target)
+
+                if new_dynamic_mem == set():
+                    print("Forward Pass Done")
+                    print(message_dict)
+                    break
+                dynamic_mem = new_dynamic_mem
+
+            return dynamic_mem
+
+        def receive_message(junc_tree, potentials, message_dict, dynamic_mem):
+            while 1:
+                new_dynamic_mem = set()
+                for node in dynamic_mem:
+                    for target in junc_tree[node]:
+                        potn = potentials[tuple(node)]
+                        if message_dict[target][node] != None and message_dict[node][target] == None:
+                            for neigh in junc_tree[node]:
+                                if neigh != target:
+                                    potn = multiply_messages(potn, message_dict[neigh][node], node, set(node).intersection(neigh))
+                            diff = set(node).difference(target)
+                            summing_nodes = set(node).difference(diff)
+                            message_dict[node][target] = condense_message(
+                                potn, node, summing_nodes, diff
+                            )
+                            new_dynamic_mem.add(target)
+
+                if new_dynamic_mem == set():
+                    print("Backward Pass Done")
+                    print(message_dict)
+                    break
+        
+        def calc_z(message_dict, potentials, max_cliques):
+            node = list(max_cliques.keys())[0]
+            z = potentials[node]
+            for neigh in message_dict[node]:
+                z = multiply_messages(z, message_dict[neigh][node], node, set(node).intersection(neigh))
+            z = condense_message(z, node, [], node)
+            return z[0]
+
+        message_dict = create_empty_message_dict(self.junction_tree)
+        print(self.junction_tree)
+        print(self.max_clique_potentials)
+        dynamic_mem = send_message(self.junction_tree, self.max_clique_potentials, message_dict)
+        receive_message(self.junction_tree, self.max_clique_potentials, message_dict, dynamic_mem)
+        z = calc_z(message_dict, self.max_clique_potentials, self.max_clique_potentials)
+        return z
 
     def compute_marginals(self):
         """
@@ -366,7 +481,7 @@ class Get_Input_and_Check_Output:
                     "Z_value": z_value,
                 }
             )
-            print("-"*50)
+            print("-" * 50)
         self.output = output
 
     def write_output(self, file_name):
@@ -375,7 +490,7 @@ class Get_Input_and_Check_Output:
 
 
 if __name__ == "__main__":
-    # evaluator = Get_Input_and_Check_Output("Sample_Testcase copy.json")
+    # evaluator = Get_Input_and_Check_Output("Sample_Testcase.json")
     evaluator = Get_Input_and_Check_Output("Testcases.json")
     evaluator.get_output()
     evaluator.write_output("Sample_Testcase_Output.json")

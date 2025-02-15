@@ -353,6 +353,7 @@ class Get_Input_and_Check_Output:
         n = len(self.data)
         output = []
         for i in range(n):
+            print(f"Testcase {i+1}")
             inference = Inference(self.data[i]["Input"])
             inference.triangulate_and_get_cliques()
             inference.get_junction_tree()
@@ -367,6 +368,7 @@ class Get_Input_and_Check_Output:
                     "Z_value": z_value,
                 }
             )
+            print("-"*50)
         self.output = output
 
     def write_output(self, file_name):
@@ -375,6 +377,7 @@ class Get_Input_and_Check_Output:
 
 
 if __name__ == "__main__":
-    evaluator = Get_Input_and_Check_Output("Sample_Testcase copy.json")
+    # evaluator = Get_Input_and_Check_Output("Sample_Testcase copy.json")
+    evaluator = Get_Input_and_Check_Output("Testcases.json")
     evaluator.get_output()
     evaluator.write_output("Sample_Testcase_Output.json")

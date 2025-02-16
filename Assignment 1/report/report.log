@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 23.12) (preloaded format=pdflatex 2024.1.22)  15 FEB 2025 21:58
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 23.12) (preloaded format=pdflatex 2024.1.22)  16 FEB 2025 12:30
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -317,36 +317,26 @@ Package hyperref Info: Link coloring OFF on input line 14.
 
  [1
 
-{C:/Users/deept/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}]
-Overfull \hbox (8.65701pt too wide) in paragraph at lines 91--91
- []            \OT1/cmtt/m/n/12 add all the neighbors of the simplicial node to the clique[] 
- []
-
-
-Overfull \hbox (21.00702pt too wide) in paragraph at lines 91--91
- []            \OT1/cmtt/m/n/12 remove the simplicial node from the temporary adjacency list[] 
- []
-
-[2] [3] [4] (report.aux)
+{C:/Users/deept/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}] [2] [3] (report.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-04>
  ***********
 Package rerunfilecheck Info: File `report.out' has not changed.
-(rerunfilecheck)             Checksum: EAB3AFF96DA3E3BD98D436CBABEF4D3D;791.
+(rerunfilecheck)             Checksum: 3AB22313D64DEFA3574648B29C60AEE6;1465.
  ) 
 Here is how much of TeX's memory you used:
- 9536 strings out of 474486
- 148598 string characters out of 5743755
+ 9588 strings out of 474486
+ 149063 string characters out of 5743755
  1939542 words of memory out of 5000000
- 31713 multiletter control sequences out of 15000+600000
- 561112 words of font info for 47 fonts, out of 8000000 for 9000
+ 31729 multiletter control sequences out of 15000+600000
+ 564867 words of font info for 61 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,6n,79p,457b,681s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,6n,79p,470b,610s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt12.pfb>
-Output written on report.pdf (4 pages, 66086 bytes).
+Output written on report.pdf (3 pages, 69941 bytes).
 PDF statistics:
- 78 PDF objects out of 1000 (max. 8388607)
- 18 named destinations out of 1000 (max. 500000)
- 49 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 122 PDF objects out of 1000 (max. 8388607)
+ 46 named destinations out of 1000 (max. 500000)
+ 81 words of extra memory for PDF output out of 10000 (max. 10000000)
 

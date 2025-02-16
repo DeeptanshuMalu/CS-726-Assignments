@@ -26,136 +26,86 @@ The preprocessing step involves converting the given data into a suitable format
 
 \section{Triangulation}
 
+\subsection{triangulate\_and\_get\_cliques}
 Here are some of the functions we have defined for the triangulation and maximum clique finding process:
 
 \begin{enumerate}
     \item \textbf{is\_simplicial:} This function checks if a given node is simplicial in the graph. A node is simplicial if the neighbors of the node form a clique.
-    
-\begin{verbatim}
-function is_simplicial(adjacency_list, node):
-    for every pairs of neighbors of node:
-            if the pair is not connected:
-                return False
-    return True
-\end{verbatim}
 
     \item \textbf{find\_simplicial\_vertex:} This function finds a simplicial vertex in the graph. If no simplicial vertex is found, it returns None.
-    
-\begin{verbatim}
-function find_simplicial_vertex(adjacency_list):
-    for each node in the graph:
-        if the node is simplicial:
-            return node
-    return None
-\end{verbatim}
 
     \item \textbf{make\_vertex\_simplicial:} This function makes a given node simplicial by adding edges between all the neighbors of the node.
-    
-\begin{verbatim}
-function make_vertex_simplicial(adjacency_list, node):
-    for every pair of neighbors of the node:
-        if the pair is not connected:
-            add an edge between the pair
-    return adjacency_list
-\end{verbatim}
 
-    \item \textbf{chordal\_graph\_with\_heuristic:} This function constructs a chordal graph from the given graph using the heuristic method. It returns a list of maximal cliques in the chordal graph.
-    
-\begin{verbatim}
-function chordal_graph_with_heuristic(adjacency_list):
-    create an temporary adjacency list from the given adjacency list
-    create an empty list for elimination order
-    create an empty list for cliques
-
-    while the length of elimination order is less than 
-    the length of adjacency list:
-        find a simplicial node in the graph
-        if a simplicial node is found:
-            add the simplicial node to the elimination order
-            create a clique with the simplicial node
-            add all the neighbors of the simplicial node to the clique
-            add the clique to the list of cliques
-            remove the simplicial node from the temporary adjacency list
-        else:
-            find the node with the least degree in the graph
-            make the node simplicial
-            add the node to the elimination order
-            create a clique with the node
-            add all the neighbors of the node to the clique
-            add the clique to the list of cliques
-            remove the node from the adjacency list
-
-    create a list of maximal cliques from the list of cliques
-    return the list of maximal cliques
-
-\end{verbatim}
- 
+    \item \textbf{chordal\_graph\_with\_heuristic:} In this function we do the following:
+        \begin{enumerate}
+            \item Find a simplicial vertex in the graph.
+            \item If a simplicial vertex is found, take its neighbors and store it in the maximum clique list.
+            \item If no simplicial vertex is found, take a node based on the heuristic that the node has the minimum degree. Make this node simplicial and take its neighbors and store it in the maximum clique list.
+            \item Repeat the process until all the nodes are covered.
+            \item If a clique found is already a subset of a previously found clique, discard it.
+            \item Return the maximal cliques found.
+        \end{enumerate}
 
 \end{enumerate}
 
-
-\begin{verbatim}
-def chordal_graph_with_heuristic(adjlist):
-    chordal_adjlist = deepcopy(adjlist)
-    elimination_order = []
-    cliques = []
-
-    while len(elimination_order) < len(adjlist):
-        simplicial_node = find_simplicial_vertex(chordal_adjlist)
-
-        if simplicial_node is not None:
-            elimination_order.append(simplicial_node)
-            clique = {simplicial_node}
-            neighbours = chordal_adjlist[simplicial_node]
-            for neigh in neighbours:
-                if all(neigh in chordal_adjlist[i] for i in clique):
-                    clique.add(neigh)
-            cliques.append(clique)
-            for neighbor in chordal_adjlist[simplicial_node]:
-                chordal_adjlist[neighbor].remove(simplicial_node)
-            del chordal_adjlist[simplicial_node]
-        else:
-            degrees = {
-                node: len(neighbors)
-                for node, neighbors in chordal_adjlist.items()
-            }
-            least_degree_node = min(degrees, key=degrees.get)
-            chordal_adjlist = make_vertex_simplicial(
-                chordal_adjlist, least_degree_node
-            )
-            elimination_order.append(least_degree_node)
-            clique = {least_degree_node}
-            neighbours = chordal_adjlist[least_degree_node]
-            for neigh in neighbours:
-                if all(neigh in chordal_adjlist[i] for i in clique):
-                    clique.add(neigh)
-            cliques.append(clique)
-            for neighbor in chordal_adjlist[least_degree_node]:
-                chordal_adjlist[neighbor].remove(least_degree_node)
-            del chordal_adjlist[least_degree_node]
-
-    max_cliques = []
-    for clique in cliques:
-        is_subset = False
-        for m_clique in max_cliques:
-            if clique.issubset(m_clique):
-                is_subset = True
-                break
-        if not is_subset:
-            max_cliques.append(clique)
-
-    return max_cliques
-
-max_cliques = chordal_graph_with_heuristic(self.adjlist)
-self.max_cliques = max_cliques
-print("Adjacency List:")
-for node, neighbors in self.adjlist.items():
-    print(f"{node}: {neighbors}")
-print("Maximal Cliques:", self.max_cliques)
-\end{verbatim}
-
 \section{Junction Tree Construction}
+
+\subsection{get\_junction\_tree}
+In this section, we have defined the following functions for constructing the junction tree:
+
+\begin{enumerate}
+    \item \textbf{create\_junction\_graph}: This function creates a junction graph from the found maximal cliques. We iterate over all the maximal cliques and add an edge between two maximal cliques if they have a common node. We also assign a weight to each edge which is the size of the intersection of the two maximal cliques.
+    
+    \item \textbf{make\_junction\_tree}: This function creates a junction tree from the junction graph. We first find the maximum spanning tree of the junction graph using Kruskal's algorithm. This tree is the junction tree.
+\end{enumerate}
+
+\subsection{assign\_potentials\_to\_cliques}
+
+In this section, we have defined the following functions for assigning potentials to the cliques:
+
+\begin{enumerate}
+    \item \textbf{multiply\_potentials}: This function takes two potentials and there corresponding cliques and multiplies them to get a new potential and a new clique.
+\end{enumerate}
+
+After this we iterate over all the maximal cliques and for each clique, we find all the clique potentials that are subsets of the maximal clique. We multiply all these potentials to get the potential for the maximal clique.
+
 \section{Marginal Probability}
+
+\subsection{get\_z\_value}
+In this section, we have defined the following functions for finding the Z value:
+
+\begin{enumerate}
+    \item \textbf{create\_empty\_message\_dict}: This function creates an empty message dictionary for all the cliques in the junction tree. The dictionary has the sender clique as the key and the value is a dictionary with the receiver clique as the key and its value is the message from the sender clique to the receiver clique.
+    
+    \item \textbf{multiply\_messages}: This function takes a potential of the clique or a precomputed value (potential is already multiplied with some messages) and a message to be multiplied as input and it multiplies them to get a new potential.
+    
+    \item \textbf{condense\_message}: This function takes a potential and the nodes to be marginalized on and marginalizes the potential to get a new potential.
+    
+    \item \textbf{send\_message}: In this function, we do a forward pass of message passing. These are the steps we follow:
+        \begin{enumerate}
+            \item We maintain a list of nodes who have to send messages to their neighbors. This is initialized with the leaf nodes of the junction tree.
+            \item We iterate over all the nodes in the list and send messages from the node to all its neighbors using the $\texttt{multiply\_messages}$ and $\texttt{condense\_message}$ functions.
+            \item When a message is sent from a node to its neighbor, we update the message dictionary.
+            \item After iterating over all the nodes in the list, we remove the nodes from the list and add their neighbors to whom messages were sent to the list.
+            \item We repeat the process until the list is empty and final non-empty value of the list is the root of the junction tree.
+        \end{enumerate}
+    
+    \item \textbf{receive\_message}: In this function, we do a backward pass of message passing. These are the steps we follow:
+        \begin{enumerate}
+            \item We maintain a list of nodes who have to send messages to their neighbors. This is initialized with the root of the junction tree.
+            \item We iterate over all the nodes in the list and send messages from the node to all its neighbors using the $\texttt{multiply\_messages}$ and $\texttt{condense\_message}$ functions.
+            \item When a message is sent from a node to its neighbor, we update the message dictionary.
+            \item After iterating over all the nodes in the list, we remove the nodes from the list and add their neighbors to whom messages were sent to the list.
+            \item We repeat the process until the list is empty.
+        \end{enumerate}
+    
+    \item \textbf{calc\_z}: This function calculates the Z value using the fully updated message dictionary. We simply choose any maximal clique and marginalize it on all it component nodes to get the Z value.
+    
+\end{enumerate}
+
+
+
+
 \section{MAP Assignment}
 \section{Top k Assignments}
 

@@ -75,7 +75,7 @@ class Inference:
 
         def find_simplicial_vertex(adjlist):
             for node in adjlist:
-                if adjlist[node] and is_simplicial(adjlist, node):
+                if is_simplicial(adjlist, node):
                     return node
             return None
 
@@ -258,35 +258,43 @@ class Inference:
 
         Refer to the sample test case for how potentials are associated with cliques.
         """
+
+        def multiply_potentials(potential1, potential2, potn1_depends_on, potn2_depends_on):
+            potential_new = [None] * (2 ** (len(set(potn1_depends_on).union(potn2_depends_on))))
+            for val in itertools.product([0, 1], repeat=len(set(potn1_depends_on).union(potn2_depends_on))):
+                assignmt = dict(zip(set(potn1_depends_on).union(potn2_depends_on), val))
+                potn1_idx = 0
+                for t in potn1_depends_on:
+                    potn1_idx = (potn1_idx << 1) + assignmt[t]
+
+                potn2_idx = 0
+                for t in potn2_depends_on:
+                    potn2_idx = (potn2_idx << 1) + assignmt[t]
+
+                net_idx = 0
+                for t in set(potn1_depends_on).union(potn2_depends_on):
+                    net_idx = (net_idx << 1) + assignmt[t]
+
+                potential_new[net_idx] = potential1[potn1_idx] * potential2[potn2_idx]
+
+            return potential_new, set(potn1_depends_on).union(potn2_depends_on)
+
         max_clique_potentials = {}
         for max_clique in self.max_cliques:
-            subset_clique_potentials = {}
+            subset_cliques = []
             for clique in self.clique_potentials:
                 if set(clique).issubset(max_clique):
-                    subset_clique_potentials[clique] = self.clique_potentials[clique]
+                    subset_cliques.append(clique)
 
-            # For each possible binary assignment to variables in max_clique
-            max_clique_list = list(max_clique)
-            potential_values = []
-
-            # Generate all possible binary combinations for variables in max_clique
-            for values in itertools.product([0, 1], repeat=len(max_clique_list)):
-                assignment = dict(zip(max_clique_list, values))
-
-                # Initialize potential for this assignment
-                potential = 1
-
-                # Multiply potentials from all subset cliques
-                for clique, subset_clique_potential in subset_clique_potentials.items():
-                    # Get the index in potentials for this assignment
-                    idx = 0
-                    bin_index = ""
-                    for var in clique:
-                        bin_index += str(assignment[var])
-                    idx = int(bin_index, 2)
-                    potential *= subset_clique_potential[idx]
-
-                potential_values.append(potential)
+            potential_values = self.clique_potentials[subset_cliques[0]]
+            depends_on = set(subset_cliques[0])
+            for clique in subset_cliques[1:]:
+                # print("multiplying", potential_values, self.clique_potentials[clique], depends_on, set(clique))
+                potential_values, depends_on = multiply_potentials(
+                    potential_values, self.clique_potentials[clique], depends_on, set(clique)
+                )
+            # print("final potential", potential_values)
+            # print("end")
 
             max_clique_potentials[tuple(max_clique)] = potential_values
 
@@ -315,12 +323,12 @@ class Inference:
                     message_dict[node][neighbor] = None
             return message_dict
 
-        def multiply_messages(potential, message, node, target):
+        def multiply_messages(potential, message, node, mesg_depends_on):
             potential_new = deepcopy(potential)
             for val in itertools.product([0, 1], repeat=len(node)):
                 assignmt = dict(zip(node, val))
                 targ_idx = 0
-                for t in target:
+                for t in mesg_depends_on:
                     targ_idx = (targ_idx << 1) + assignmt[t]
 
                 node_idx = 0
@@ -331,15 +339,15 @@ class Inference:
 
             return potential_new
 
-        def condense_message(potential, node, summing_nodes, diff):
+        def condense_message(potential, node, compl_to_sum_on, to_sum_on):
             new_potential = []
-            for val in itertools.product([0, 1], repeat=len(summing_nodes)):
+            for val in itertools.product([0, 1], repeat=len(compl_to_sum_on)):
                 sum_val = 0
                 for val1 in itertools.product(
-                    [0, 1], repeat=len(node) - len(summing_nodes)
+                    [0, 1], repeat=len(node) - len(compl_to_sum_on)
                 ):
-                    assignmt = dict(zip(summing_nodes, val))
-                    assignmt.update(dict(zip(diff, val1)))
+                    assignmt = dict(zip(compl_to_sum_on, val))
+                    assignmt.update(dict(zip(to_sum_on, val1)))
                     idx = 0
                     for n in node:
                         idx = (idx << 1) + assignmt[n]
@@ -357,58 +365,70 @@ class Inference:
                 return leaves
 
             dynamic_mem = find_leaves(junc_tree)
-            while 1:
+            while True:
                 new_dynamic_mem = set()
                 for node in dynamic_mem:
-                    potn = None
+                    print("Node:", node)
                     for target in junc_tree[node]:
+                        potn = deepcopy(potentials[tuple(node)])
                         if message_dict[target][node] != None:
+                            print("Target for recieving:", target)
                             mes = message_dict[target][node]
-                            potn = potentials[tuple(node)]
+                            print("multiplying", potn, mes, node, set(node).intersection(target))
                             potn = multiply_messages(potn, mes, node, set(node).intersection(target))
 
                     for target in junc_tree[node]:
                         if message_dict[target][node] == None:
+                            print("Target for sending:", target)
                             diff = set(node).difference(target)
-                            potn = potentials[tuple(node)]
                             summing_nodes = set(node).difference(diff)
+                            print("condensing", potn, node, summing_nodes, diff)
                             message_dict[node][target] = condense_message(
                                 potn, node, summing_nodes, diff
                             )
                             new_dynamic_mem.add(target)
+                    print("dynamic_mem:", dynamic_mem)
+                    print("-" * 50)
 
                 if new_dynamic_mem == set():
                     print("Forward Pass Done")
-                    print(message_dict)
+                    # print(message_dict)
                     break
                 dynamic_mem = new_dynamic_mem
 
             return dynamic_mem
 
         def receive_message(junc_tree, potentials, message_dict, dynamic_mem):
-            while 1:
+            while True:
                 new_dynamic_mem = set()
                 for node in dynamic_mem:
+                    print("Node:", node)
                     for target in junc_tree[node]:
-                        potn = potentials[tuple(node)]
-                        if message_dict[target][node] != None and message_dict[node][target] == None:
+                        print("Target:", target)
+                        potn = deepcopy(potentials[tuple(node)])
+                        if message_dict[node][target] == None:
                             for neigh in junc_tree[node]:
                                 if neigh != target:
+                                    print("multiplying", potn, message_dict[neigh][node], node, set(node).intersection(neigh))
                                     potn = multiply_messages(potn, message_dict[neigh][node], node, set(node).intersection(neigh))
                             diff = set(node).difference(target)
                             summing_nodes = set(node).difference(diff)
+                            print("condensing", potn, node, summing_nodes, diff)
                             message_dict[node][target] = condense_message(
                                 potn, node, summing_nodes, diff
                             )
                             new_dynamic_mem.add(target)
+                        print("dynamic_mem:", dynamic_mem)
+                        print("-" * 50)
 
                 if new_dynamic_mem == set():
                     print("Backward Pass Done")
                     print(message_dict)
                     break
+                dynamic_mem = new_dynamic_mem
         
-        def calc_z(message_dict, potentials, max_cliques):
-            node = list(max_cliques.keys())[0]
+        def calc_z(message_dict, potentials):
+            node = list(potentials.keys())[0]
             z = potentials[node]
             for neigh in message_dict[node]:
                 z = multiply_messages(z, message_dict[neigh][node], node, set(node).intersection(neigh))
@@ -416,11 +436,16 @@ class Inference:
             return z[0]
 
         message_dict = create_empty_message_dict(self.junction_tree)
+        # print("Cliques and potentials:")
+        # print(self.clique_potentials)
+        print("junction_tree:")
         print(self.junction_tree)
-        print(self.max_clique_potentials)
+        # print("Maximal Clique Potentials:")
+        # print(self.max_clique_potentials)
         dynamic_mem = send_message(self.junction_tree, self.max_clique_potentials, message_dict)
         receive_message(self.junction_tree, self.max_clique_potentials, message_dict, dynamic_mem)
-        z = calc_z(message_dict, self.max_clique_potentials, self.max_clique_potentials)
+        z = calc_z(message_dict, self.max_clique_potentials)
+        self.message_dict = message_dict
         return z
 
     def compute_marginals(self):
@@ -434,7 +459,70 @@ class Inference:
 
         Refer to the sample test case for the expected format of the marginals.
         """
-        pass
+
+        def multiply_messages(potential, message, node, mesg_depends_on):
+            potential_new = deepcopy(potential)
+            for val in itertools.product([0, 1], repeat=len(node)):
+                assignmt = dict(zip(node, val))
+                targ_idx = 0
+                for t in mesg_depends_on:
+                    targ_idx = (targ_idx << 1) + assignmt[t]
+
+                node_idx = 0
+                for n in node:
+                    node_idx = (node_idx << 1) + assignmt[n]
+
+                potential_new[node_idx] *= message[targ_idx]
+
+            return potential_new
+
+        def condense_message(potential, node, compl_to_sum_on, to_sum_on):
+            new_potential = []
+            for val in itertools.product([0, 1], repeat=len(compl_to_sum_on)):
+                sum_val = 0
+                for val1 in itertools.product(
+                    [0, 1], repeat=len(node) - len(compl_to_sum_on)
+                ):
+                    assignmt = dict(zip(compl_to_sum_on, val))
+                    assignmt.update(dict(zip(to_sum_on, val1)))
+                    idx = 0
+                    for n in node:
+                        idx = (idx << 1) + assignmt[n]
+                    sum_val += potential[idx]
+                new_potential.append(sum_val)
+
+            return new_potential
+
+        nodes = set()
+        for clique in self.max_cliques:
+            for node in clique:
+                nodes.add(node)
+        nodes = sorted(list(nodes))
+
+        z = self.get_z_value()
+        marginals = [None] * len(nodes)
+        for i, node in enumerate(nodes):
+            marginals[i] = [0, 0]
+            super_clique = None
+            for clique in self.max_cliques:
+                if node in clique:
+                    super_clique = clique
+                    break
+
+            neighbors = self.junction_tree[tuple(super_clique)]
+            potential = deepcopy(self.max_clique_potentials[tuple(super_clique)])
+            for neigh in neighbors:
+                potential = multiply_messages(
+                    potential, self.message_dict[neigh][tuple(super_clique)], super_clique, set(super_clique).intersection(neigh)
+                )
+            potential = condense_message(potential, super_clique, [node], set(super_clique).difference([node]))
+
+            marginals[i][0] = potential[0] / z
+            marginals[i][1] = potential[1] / z
+
+        return marginals
+
+
 
     def compute_top_k(self):
         """

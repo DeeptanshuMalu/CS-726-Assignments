@@ -3,6 +3,8 @@
 \usepackage{geometry}
 \geometry{a4paper, margin=1in}
 
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{hyperref}
@@ -20,7 +22,8 @@
 The preprocessing step involves converting the given data into a suitable format for further processing. We have done the following preprocessing steps:
 
 \begin{enumerate}
-    \item \textbf{Clique Potentials:} Converted all the cliques and potentials data into a dictionary format. The keys of the dictionary are the cliques and the values are the potentials. \item \textbf{Edges:} Converted all the cliques into a set of tuples, where each tuple consists of two nodes that are connected by an edge.
+    \item \textbf{Clique Potentials:} Converted all the cliques and potentials data into a dictionary format. The keys of the dictionary are the cliques and the values are the potentials. If a clique already exists in the dictionary, we multiply the potential with the existing potential.
+    \item \textbf{Edges:} Converted all the cliques into a set of tuples, where each tuple consists of two nodes that are connected by an edge.
     \item \textbf{Nodes:} Converted the edge set into a set of all the nodes in the graph.
 \end{enumerate}
 
@@ -31,10 +34,59 @@ Here are some of the functions we have defined for the triangulation and maximum
 
 \begin{enumerate}
     \item \textbf{is\_simplicial:} This function checks if a given node is simplicial in the graph. A node is simplicial if the neighbors of the node form a clique.
+    
+    \begin{algorithm}
+        \caption{Check if a vertex is simplicial}
+        \begin{algorithmic}[1]
+        \Function{IsSimplicial}{$adjlist, node$}
+            \State $neighbors \gets adjlist[node]$
+            \For{$i \gets 1$ to $|neighbors|$}
+                \For{$j \gets i + 1$ to $|neighbors|$}
+                    \If{$neighbors[j] \notin adjlist[neighbors[i]]$}
+                        \State \Return False
+                    \EndIf
+                \EndFor
+            \EndFor
+            \State \Return True
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
 
     \item \textbf{find\_simplicial\_vertex:} This function finds a simplicial vertex in the graph. If no simplicial vertex is found, it returns None.
+    
+    \begin{algorithm}
+        \caption{Find a simplicial vertex}
+        \begin{algorithmic}[1]
+        \Function{FindSimplicialVertex}{$adjlist$}
+            \For{$node$ in $adjlist$}
+                \If{\Call{IsSimplicial}{$adjlist, node$}}
+                    \State \Return $node$
+                \EndIf
+            \EndFor
+            \State \Return None
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
 
     \item \textbf{make\_vertex\_simplicial:} This function makes a given node simplicial by adding edges between all the neighbors of the node.
+    
+    \begin{algorithm}
+        \caption{Make a vertex simplicial}
+        \begin{algorithmic}[1]
+        \Function{MakeVertexSimplicial}{$adjlist, node$}
+            \State $neighbors \gets adjlist[node]$
+            \For{$i \gets 1$ to $|neighbors|$}
+                \For{$j \gets i + 1$ to $|neighbors|$}
+                    \If{$neighbors[j] \notin adjlist[neighbors[i]]$}
+                        \State $adjlist[neighbors[i]].append(neighbors[j])$
+                        \State $adjlist[neighbors[j]].append(neighbors[i])$
+                    \EndIf
+                \EndFor
+            \EndFor
+            \State \Return $adjlist$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
 
     \item \textbf{chordal\_graph\_with\_heuristic:} In this function we do the following:
         \begin{enumerate}
@@ -44,9 +96,40 @@ Here are some of the functions we have defined for the triangulation and maximum
             \item Repeat the process until all the nodes are covered.
             \item If a clique found is already a subset of a previously found clique, discard it.
             \item Return the maximal cliques found.
+            
+            \begin{algorithm}
+                \caption{Compute chordal graph with heuristic}
+                \begin{algorithmic}[1]
+                \Function{ChordalGraphWithHeuristic}{$adjlist$}
+                    \State $chordal\_adjlist \gets$ deepcopy($adjlist$)
+                    \State $elimination\_order, cliques \gets [], []$
+                
+                    \While{$|elimination\_order| < |adjlist|$}
+                        \State $node \gets$ \Call{FindSimplicialVertex}{$chordal\_adjlist$}
+                        \If{$node = None$}
+                            \State $node \gets \arg\min \{|neighbors| : node \in chordal\_adjlist\}$
+                            \State $chordal\_adjlist \gets$ \Call{MakeVertexSimplicial}{$chordal\_adjlist, node$}
+                        \EndIf
+                        
+                        \State $elimination\_order.append(node)$
+                        \State $clique \gets \{node\} \cup \{n \mid n \in chordal\_adjlist[node], \forall i \in clique, n \in chordal\_adjlist[i]\}$
+                        \State $cliques.append(clique)$
+                        
+                        \For{$neighbor \in chordal\_adjlist[node]$}
+                            \State $chordal\_adjlist[neighbor].remove(node)$
+                        \EndFor
+                        \State delete $chordal\_adjlist[node]$
+                    \EndWhile
+                
+                    \State \Return \Call{FilterMaximalCliques}{$cliques$}
+                \EndFunction
+                \end{algorithmic}
+            \end{algorithm}
         \end{enumerate}
 
 \end{enumerate}
+
+\newpage
 
 \section{Junction Tree Construction}
 
@@ -56,8 +139,78 @@ In this section, we have defined the following functions for constructing the ju
 \begin{enumerate}
     \item \textbf{create\_junction\_graph}: This function creates a junction graph from the found maximal cliques. We iterate over all the maximal cliques and add an edge between two maximal cliques if they have a common node. We also assign a weight to each edge which is the size of the intersection of the two maximal cliques.
     
+    \begin{algorithm}
+        \caption{Create Junction Graph}
+        \begin{algorithmic}[1]
+        \Function{CreateJunctionGraph}{$cliques$}
+            \State $J \gets \{\}$
+            \For{$C_1, C_2 \in cliques, C_1 \neq C_2$}
+                \State $I \gets C_1 \cap C_2$
+                \If{$I \neq \emptyset$}
+                    \State $w \gets |I|$
+                    \State $J[C_1] \gets J[C_1] \cup \{(C_2, w)\}$
+                    \State $J[C_2] \gets J[C_2] \cup \{(C_1, w)\}$
+                \EndIf
+            \EndFor
+            \State \Return $J$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}        
+    
     \item \textbf{make\_junction\_tree}: This function creates a junction tree from the junction graph. We first find the maximum spanning tree of the junction graph using Kruskal's algorithm. This tree is the junction tree.
+    
+    \begin{algorithm}
+        \caption{Make Junction Tree}
+        \begin{algorithmic}[1]
+        \Function{MakeJunctionTree}{$J$}
+            \State $E \gets$ sorted edges of $J$ by weight (descending)
+            \State Initialize $parent, rank$ for union-find
+            \State $T \gets \{\}$
+        
+            \For{$(C_1, C_2, w) \in E$}
+                \If{\Call{Find}{$C_1$} $\neq$ \Call{Find}{$C_2$}}
+                    \State \Call{Union}{$C_1, C_2$}
+                    \State $T[C_1] \gets T[C_1] \cup \{C_2\}$
+                    \State $T[C_2] \gets T[C_2] \cup \{C_1\}$
+                \EndIf
+            \EndFor
+            \State \Return $T$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+
+    \item \textbf{get\_message\_passing\_order}: This function gets the order in which the messages should be passed in the junction tree. We do a depth-first search on the junction tree and store the order in which the nodes are visited. Here first a tree is created from the junction tree and then a post-order traversal and a pre-order traversal is done to get the message passing order.
+    
+    \begin{algorithm}
+        \caption{Get Message Passing Order}
+        \begin{algorithmic}[1]
+        \Function{GetMessageOrder}{$T, root$}
+            \State Initialize $D, P$ with BFS from $root$
+            \State $C2P, P2C \gets []$
+        
+            \Procedure{Postorder}{$node$}
+                \For{$child \in D[node]$} 
+                    \State \Call{Postorder}{$child$}
+                    \State $C2P.append((child, node))$
+                \EndFor
+            \EndProcedure
+        
+            \Procedure{Preorder}{$node$}
+                \For{$child \in D[node]$} 
+                    \State $P2C.append((node, child))$
+                    \State \Call{Preorder}{$child$}
+                \EndFor
+            \EndProcedure
+        
+            \State \Call{Postorder}{$root$}, \Call{Preorder}{$root$}
+            \State \Return $C2P + P2C$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
 \end{enumerate}
+
+\newpage
 
 \subsection{assign\_potentials\_to\_cliques}
 
@@ -65,9 +218,69 @@ In this section, we have defined the following functions for assigning potential
 
 \begin{enumerate}
     \item \textbf{multiply\_potentials}: This function takes two potentials and there corresponding cliques and multiplies them to get a new potential and a new clique.
+    
+    \begin{algorithm}
+        \caption{Multiply Potentials}
+        \begin{algorithmic}[1]
+        \Function{MultiplyPotentials}{$P_1, P_2, D_1, D_2$}
+            \State $D \gets D_1 \cup D_2$
+            \State $P_{new} \gets$ array of size $2^{|D|}$ initialized to None
+        
+            \For{$val \in \{0,1\}^{|D|}$}
+                \State $A \gets$ mapping of $D$ to $val$
+                \State $i_1 \gets$ index of $A$ restricted to $D_1$
+                \State $i_2 \gets$ index of $A$ restricted to $D_2$
+                \State $i_{new} \gets$ index of $A$ over $D$
+                \State $P_{new}[i_{new}] \gets P_1[i_1] \times P_2[i_2]$
+            \EndFor
+        
+            \State \Return $(P_{new}, D)$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
 \end{enumerate}
 
 After this we iterate over all the maximal cliques and for each clique, we find all the clique potentials that are subsets of the maximal clique. We multiply all these potentials to get the potential for the maximal clique.
+
+\begin{algorithm}
+    \caption{Compute Maximum Clique Potentials}
+    \begin{algorithmic}[1]
+    \State $MCP \gets \{\}$ \Comment{Stores max clique potentials}
+    \State $VC \gets \{\}$ \Comment{Tracks visited cliques}
+    \State $CA \gets \{\}$ \Comment{Stores assigned cliques}
+    
+    \For{$MC \in max\_cliques$}
+        \State $SC \gets \{\}$ \Comment{Subset cliques of $MC$}
+        \State $CA[MC] \gets []$
+        
+        \For{$C \in clique\_potentials$}
+            \If{$C \subseteq MC$ and $C \notin VC$}
+                \State $SC \gets SC \cup \{C\}$
+                \State $VC \gets VC \cup \{C\}$
+                \State $CA[MC] \gets CA[MC] \cup \{C\}$
+            \EndIf
+        \EndFor
+        
+        \State $(P, D) \gets (clique\_potentials[first(SC)], first(SC))$
+        
+        \For{$C \in SC[1:]$}
+            \State $(P, D) \gets$ \Call{MultiplyPotentials}{$P, clique\_potentials[C], D, C$}
+        \EndFor
+        
+        \State $USC \gets \bigcup SC$ \Comment{Union of subset cliques}
+        \State $LN \gets MC - USC$ \Comment{Remaining nodes}
+        
+        \For{$N \in LN$}
+            \State $(P, D) \gets$ \Call{MultiplyPotentials}{$P, [1,1], D, \{N\}$}
+        \EndFor
+    
+        \State $MCP[MC] \gets P$
+    \EndFor
+    \end{algorithmic}
+\end{algorithm}
+    
+\newpage
 
 \section{Marginal Probability}
 
@@ -77,36 +290,283 @@ In this section, we have defined the following functions for finding the Z value
 \begin{enumerate}
     \item \textbf{create\_empty\_message\_dict}: This function creates an empty message dictionary for all the cliques in the junction tree. The dictionary has the sender clique as the key and the value is a dictionary with the receiver clique as the key and its value is the message from the sender clique to the receiver clique.
     
+    \begin{algorithm}
+        \caption{Create Empty Message Dictionary}
+        \begin{algorithmic}[1]
+        \Function{CreateEmptyMessageDict}{$J$}
+            \State $M \gets \{\}$
+            \For{$N \in J$}
+                \State $M[N] \gets \{\}$
+                \For{$N' \in J[N]$}
+                    \State $M[N][N'] \gets$ None
+                \EndFor
+            \EndFor
+            \State \Return $M$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}        
+    
     \item \textbf{multiply\_messages}: This function takes a potential of the clique or a precomputed value (potential is already multiplied with some messages) and a message to be multiplied as input and it multiplies them to get a new potential.
     
+    \begin{algorithm}
+        \caption{Multiply Messages}
+        \begin{algorithmic}[1]
+        \Function{MultiplyMessages}{$P, M, N, D$}
+            \State $P' \gets$ copy of $P$
+            \For{$val \in \{0,1\}^{|N|}$}
+                \State $A \gets$ mapping of $N$ to $val$
+                \State $i_m \gets$ index of $A$ restricted to $D$
+                \State $i_p \gets$ index of $A$ over $N$
+                \State $P'[i_p] \gets P'[i_p] \times M[i_m]$
+            \EndFor
+            \State \Return $P'$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
     \item \textbf{condense\_message}: This function takes a potential and the nodes to be marginalized on and marginalizes the potential to get a new potential.
     
-    \item \textbf{send\_message}: In this function, we do a forward pass of message passing. These are the steps we follow:
-        \begin{enumerate}
-            \item We maintain a list of nodes who have to send messages to their neighbors. This is initialized with the leaf nodes of the junction tree.
-            \item We iterate over all the nodes in the list and send messages from the node to all its neighbors using the $\texttt{multiply\_messages}$ and $\texttt{condense\_message}$ functions.
-            \item When a message is sent from a node to its neighbor, we update the message dictionary.
-            \item After iterating over all the nodes in the list, we remove the nodes from the list and add their neighbors to whom messages were sent to the list.
-            \item We repeat the process until the list is empty and final non-empty value of the list is the root of the junction tree.
-        \end{enumerate}
+    \begin{algorithm}
+        \caption{Condense Message}
+        \begin{algorithmic}[1]
+        \Function{CondenseMessage}{$P, N, C, S$}
+            \State $P' \gets []$
+            \For{$val \in \{0,1\}^{|C|}$}
+                \State $sum\_val \gets 0$
+                \For{$val' \in \{0,1\}^{|N| - |C|}$}
+                    \State $A \gets$ merge of $C \mapsto val$ and $S \mapsto val'$
+                    \State $i \gets$ index of $A$ over $N$
+                    \State $sum\_val \gets sum\_val + P[i]$
+                \EndFor
+                \State Append $sum\_val$ to $P'$
+            \EndFor
+            \State \Return $P'$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
+    \item \textbf{message\_passing\_opt\_order}: This function takes the message passing order and the junction tree and passes the messages in the optimal order. It updates the message dictionary with the new messages.
     
-    \item \textbf{receive\_message}: In this function, we do a backward pass of message passing. These are the steps we follow:
-        \begin{enumerate}
-            \item We maintain a list of nodes who have to send messages to their neighbors. This is initialized with the root of the junction tree.
-            \item We iterate over all the nodes in the list and send messages from the node to all its neighbors using the $\texttt{multiply\_messages}$ and $\texttt{condense\_message}$ functions.
-            \item When a message is sent from a node to its neighbor, we update the message dictionary.
-            \item After iterating over all the nodes in the list, we remove the nodes from the list and add their neighbors to whom messages were sent to the list.
-            \item We repeat the process until the list is empty.
-        \end{enumerate}
-    
+    \begin{algorithm}
+        \caption{Calculate Partition Function $Z$}
+        \begin{algorithmic}[1]
+        \Function{CalcZ}{$M, P$}
+            \State $N \gets$ first key in $P$
+            \State $Z \gets P[N]$
+            \For{$N' \in M[N]$}
+                \State $Z \gets$ \Call{MultiplyMessages}{$Z, M[N'][N], N, N \cap N'$}
+            \EndFor
+            \State $Z \gets$ \Call{CondenseMessage}{$Z, N, [], N$}
+            \State \Return $Z[0]$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
     \item \textbf{calc\_z}: This function calculates the Z value using the fully updated message dictionary. We simply choose any maximal clique and marginalize it on all it component nodes to get the Z value.
     
+    \begin{algorithm}
+        \caption{Message Passing with Optimized Order}
+        \begin{algorithmic}[1]
+        \Function{MessagePassingOptOrder}{$J, P, O$}
+            \State $M \gets$ \Call{CreateEmptyMessageDict}{$J$}
+            \For{$(C, N) \in O$}
+                \State $P' \gets$ copy of $P[C]$
+                \For{$N' \in J[C] \setminus \{N\}$}
+                    \State $P' \gets$ \Call{MultiplyMessages}{$P', M[N'][C], C, C \cap N'$}
+                \EndFor
+                \State $D \gets C \setminus N$
+                \State $S \gets C \setminus D$
+                \State $M[C][N] \gets$ \Call{CondenseMessage}{$P', C, S, D$}
+            \EndFor
+            \State \Return $M$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+        
 \end{enumerate}
 
+\subsection{compute\_marginals}
+In this section, we have defined the following functions for computing the marginals:
 
+\begin{enumerate}
+    \item \textbf{multiply\_messages}: Same as defined before
+    \item \textbf{condense\_message}: Same as defined before
+\end{enumerate}
 
+After this we iterate over each node. For each node we find a maximal clique that contains the node. We then multiply all the messages from the maximal clique to the node to get the marginal probability.
+
+\begin{algorithm}
+    \caption{Compute Marginals}
+    \begin{algorithmic}[1]
+    \State $M \gets$ list of size $|N|$ initialized to $[0,0]$
+    \For{$i, n$ in $N$}
+        \State $C \gets$ first clique in $C_{max}$ containing $n$
+        \State $P \gets$ copy of $P[C]$
+        \For{$N' \in J[C]$}
+            \State $P \gets$ \Call{MultiplyMessages}{$P, M_{dict}[N'][C], C, C \cap N'$}
+        \EndFor
+        \State $P \gets$ \Call{CondenseMessage}{$P, C, \{n\}, C \setminus \{n\}$}
+        \State $M[i][0] \gets P[0] / Z$
+        \State $M[i][1] \gets P[1] / Z$
+    \EndFor
+    \State \Return $M$
+    \end{algorithmic}
+\end{algorithm}
 
 \section{MAP Assignment}
+
+In this section we have to find the MAP assignment. This can be done by putting k=1 in the top k assignments function (compute\_top\_k).
+
+\newpage
+
 \section{Top k Assignments}
+
+In this section, we have defined the following functions for computing the top k assignments:
+
+\begin{enumerate}
+    \item \textbf{create\_empty\_message\_dict}: Same as defined before
+    \item \textbf{multiply\_messages}: This is similar to the previous function but it also keeps track of the assignments and potential values for each assignment.
+    
+    \begin{algorithm}
+        \caption{Multiply Messages}
+        \begin{algorithmic}[1]
+        \Function{MultiplyMessages}{$potential$, $message$, $node$, $mesg\_depends\_on$}
+            \State $potential\_new \gets \text{empty list}$
+            \For{$val$ in all combinations of $[0, 1]$ for $node$}
+                \State $assignmt \gets \text{map } node \text{ to } val$
+                \State $targ\_idx \gets \text{index from } assignmt \text{ for } mesg\_depends\_on$
+                \State $node\_idx \gets \text{index from } assignmt \text{ for } node$
+                \For{$pot\_assgn$ in $potential[node\_idx]$}
+                    \For{$mesg\_assgn$ in $message[targ\_idx]$}
+                        \If{assignments match on $mesg\_depends\_on$}
+                            \State $new\_assgn \gets \text{combine } pot\_assgn \text{ and } mesg\_assgn$
+                            \State Append $new\_assgn$ to $potential\_new[node\_idx]$
+                        \EndIf
+                    \EndFor
+                \EndFor
+            \EndFor
+            \State \Return $potential\_new$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+    
+    \item \textbf{condense\_message}: Similar to the previous function but it also keeps track of the top k assignments and potential values for each assignment.
+    
+    \begin{algorithm}
+        \caption{Condense Message}
+        \begin{algorithmic}[1]
+        \Function{CondenseMessage}{$potential$, $node$, $compl\_to\_topk\_on$, $to\_topk\_on$}
+            \State $new\_potential \gets \text{empty list}$
+            \For{$val$ in all combinations of $[0, 1]$ for $compl\_to\_topk\_on$}
+                \State $topk\_things \gets \text{empty list}$
+                \For{$val1$ in all combinations of $[0, 1]$ for $to\_topk\_on$}
+                    \State $assignmt \gets \text{combine } val \text{ and } val1$
+                    \State $idx \gets \text{index from } assignmt \text{ for } node$
+                    \For{$pot\_assgn$ in $potential[idx]$}
+                        \State Update $pot\_assgn$ with $val1$
+                        \State Append $pot\_assgn$ to $topk\_things$
+                    \EndFor
+                \EndFor
+                \State Sort $topk\_things$ and keep top $k$
+                \State Append $topk\_things$ to $new\_potential$
+            \EndFor
+            \State \Return $new\_potential$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+
+    \item \textbf{message\_passing\_opt\_order\_topk}: This function is similar to the previous function but it also keeps track of the top k assignments and potential values for each assignment.
+    
+    \begin{algorithm}
+        \caption{Message Passing with Optimal Order and Top-K}
+        \begin{algorithmic}[1]
+        \Function{MessagePassingOptOrderTopK}{$junc\_tree$, $potentials$, $opt\_order$}
+            \State $message\_dict \gets \text{CreateEmptyMessageDict}(junc\_tree)$
+            \For{$(m\_clique, neigh)$ in $opt\_order$}
+                \State $potn\_message \gets \text{initialize with } potentials[m\_clique]$
+                \For{$neigh1$ in $junc\_tree[m\_clique]$}
+                    \If{$neigh1 \neq neigh$}
+                        \State $potn\_message \gets \text{MultiplyMessages}(potn\_message,$
+                        \State $\quad message\_dict[neigh1][m\_clique], m\_clique,$
+                        \State $\quad \text{intersection of } m\_clique \text{ and } neigh1)$
+                    \EndIf
+                \EndFor
+                \State $message\_dict[m\_clique][neigh] \gets \text{CondenseMessage}($
+                \State $\quad potn\_message, m\_clique,$
+                \State $\quad \text{difference of } m\_clique \text{ and } neigh,$
+                \State $\quad \text{intersection})$
+            \EndFor
+            \State \Return $message\_dict$
+        \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+
+\end{enumerate}
+
+Finally, we take a sample maximal clique and multiply all the messages from the maximal clique to the node to get the top k assignments.
+
+\begin{algorithm}
+    \caption{Sampling and Returning Top-K Assignments}
+    \begin{algorithmic}[1]
+    \State $message\_dict \gets \text{MessagePassingOptOrderTopK}($
+    \State $\quad junction\_tree, max\_clique\_potentials, opt\_order)$
+    \State $sample\_node \gets \text{first node in } max\_cliques$
+    \State $sample\_node\_potential \gets \text{initialize with } max\_clique\_potentials[sample\_node]$
+    \For{$neigh$ in $junction\_tree[sample\_node]$}
+        \State $sample\_node\_potential \gets \text{MultiplyMessages} ($
+        \State $\qquad sample\_node\_potential, message\_dict[neigh][sample\_node],$
+        \State $\qquad sample\_node, \text{intersection of } sample\_node \text{ and }neigh)$
+    \EndFor
+    \State $top\_k\_assignments \gets \text{CondenseMessage}($
+    \State $\quad sample\_node\_potential, sample\_node, [], sample\_node)$
+    \State $top\_k\_dict\_list \gets \text{empty list}$
+    \For{$assgn$ in $top\_k\_assignments[0]$}
+        \State $assign\_list \gets \text{sorted values from } assgn[1]$
+        \State $dict\_entry \gets \{$
+        \State $\qquad "assignment": assign\_list,$
+        \State $\qquad "probability": assgn[0] / z$
+        \State $\quad \}$
+        \State Append $dict\_entry$ to $top\_k\_dict\_list$
+    \EndFor
+    \State \Return $top\_k\_dict\_list$
+    \end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+\section*{Contributions}
+
+\begin{itemize}
+    \item Deeptanshu Malu: Primarily responsible for:
+    \begin{enumerate}
+        \item Triangulation implementation and testing.
+        \item Junction Graph Construction and validation.
+        \item Development and optimization of message and potential multiplication/condensation for Marginal Probability, Z Value, and Top k Assignments.
+        \item Implementation of the Message Passing Algorithm.
+    \end{enumerate}
+
+    \item Deevyanshu Malu: Primarily responsible for:
+    \begin{enumerate}
+        \item Triangulation implementation and testing.
+        \item Junction Graph Construction and validation.
+        \item Implementation of the potential assignment to cliques.
+        \item Development of the algorithm for determining the optimal message passing order.
+        \item Development and optimization of message and potential multiplication/condensation for Top k Assignments.
+    \end{enumerate}
+\newpage
+    \item Neel Rambhia: Primarily responsible for:
+    \begin{enumerate}
+        \item Triangulation implementation and testing.
+        \item Junction Graph Construction and validation.
+        \item Implementation of the potential assignment to cliques.
+        \item Development and optimization of message and potential multiplication/condensation for Marginal Probability, Z Value, and Top k Assignments.
+    \end{enumerate}
+\end{itemize}
+
+\section*{Acknowledgements}
+
+We used Deepseek to create code for commom algorithms like Kruskal's algorithm and union-find data structure.
+We used ChatGPT to generate the code to get optimal order for message passing, but not for the actual implementation of message passing.
+We used GitHub Copilot to assist in writing the code.
 
 \end{document}

@@ -39,6 +39,8 @@ class Inference:
         self.edges = set()
         self.nodes = set()
 
+        self.k = data["k value (in top k)"]
+
         for i in data["Cliques and Potentials"]:
             if tuple(i["cliques"]) not in self.clique_potentials:
                 self.clique_potentials[tuple(i["cliques"])] = i["potentials"]
@@ -620,14 +622,12 @@ class Inference:
                 for n in node:
                     node_idx = (node_idx << 1) + assignmt[n]
 
-                potential_assignment = potential_new[node_idx]
+                potential_assignment = potential[node_idx]
                 message_assignment = message[targ_idx]
-
                 set_potential_assignment = set(potential_assignment[0][1].keys())
                 set_message_assignment = set(message_assignment[0][1].keys())
 
                 intersection = set_potential_assignment.intersection(set_message_assignment)
-                union = set_potential_assignment.union(set_message_assignment)
 
                 for pot_assignment in potential_assignment:
                     for mesg_assignment in message_assignment:
@@ -637,10 +637,12 @@ class Inference:
                                 intersection_matches = False
                                 break
                         if intersection_matches:
-                            diff_dict = {var: pot_assignment[1][var] for var in union.difference(intersection)}
+                            diff_dict = {var: mesg_assignment[1][var] for var in set_message_assignment.difference(intersection)}
                             new_assignment = deepcopy(pot_assignment)
+                            new_assignment = list(new_assignment)
                             new_assignment[0] *= mesg_assignment[0]
                             new_assignment[1].update(diff_dict)
+                            new_assignment = tuple(new_assignment)
                             potential_new[node_idx].append(new_assignment)
                 
             return potential_new
@@ -648,6 +650,22 @@ class Inference:
         def condense_message(potential, node, compl_to_topk_on, to_topk_on):
             new_potential = []
             for val in itertools.product([0, 1], repeat=len(compl_to_topk_on)):
+                topk_things = []
+                for val1 in itertools.product([0, 1], repeat=len(to_topk_on)):
+                    assignmt = dict(zip(compl_to_topk_on, val))
+                    assignmt.update(dict(zip(to_topk_on, val1)))
+                    idx = 0
+                    for n in node:
+                        idx = (idx << 1) + assignmt[n]
+
+                    potential_assignment = potential[idx]
+                    for pot_assgn in potential_assignment:
+                        pot_assgn[1].update(dict(zip(to_topk_on, val1)))
+                        topk_things.append(pot_assgn)
+                topk_things.sort(key=lambda x: -x[0])
+                topk_things = topk_things[:self.k]
+                new_potential.append(topk_things)
+            return new_potential
 
         
         def brute_force_message_passing_top_k(junc_tree, potentials, max_cliques):
@@ -677,6 +695,33 @@ class Inference:
                             diff = set(m_clique).difference(neigh)
                             summing_nodes = set(m_clique).difference(diff)
                             message_dict[m_clique][neigh] = condense_message(potn_message, m_clique, summing_nodes, diff)
+
+                if all_msgs:
+                    return message_dict
+                
+        message_dict = brute_force_message_passing_top_k(self.junction_tree, self.max_clique_potentials, self.max_cliques)
+                
+        sample_node = tuple(self.max_cliques[0])
+        sample_node_potential = deepcopy(self.max_clique_potentials[sample_node])
+        sample_node_potential = [[(pot, {})] for pot in sample_node_potential]
+        for neigh in self.junction_tree[sample_node]:
+            sample_node_potential = multiply_messages(sample_node_potential, message_dict[neigh][sample_node], sample_node, set(sample_node).intersection(neigh))
+
+        top_k_assignments = condense_message(sample_node_potential, sample_node, [], sample_node)
+
+        top_k_dict_list = []
+        for assgn in top_k_assignments[0]:
+            assign_list = []
+            for key in sorted(assgn[1].keys()):
+                assign_list.append(assgn[1][key])
+            val = assgn[0]/self.z
+            top_k_dict_list.append({
+                "assignment": assign_list,
+                "probability": val
+            })
+
+        return top_k_dict_list
+            
 
                             
 
@@ -722,7 +767,7 @@ class Get_Input_and_Check_Output:
 
 if __name__ == "__main__":
     # evaluator = Get_Input_and_Check_Output("Sample_Testcase.json")
-    evaluator = Get_Input_and_Check_Output("Test.json")
-    # evaluator = Get_Input_and_Check_Output("Testcases.json")
+    # evaluator = Get_Input_and_Check_Output("Test.json")
+    evaluator = Get_Input_and_Check_Output("Testcases.json")
     evaluator.get_output()
     evaluator.write_output("Sample_Testcase_Output.json")

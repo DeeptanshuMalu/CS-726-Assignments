@@ -437,36 +437,32 @@ class Inference:
             z = condense_message(z, node, [], node)
             return z[0]
         
-        # def brute_force_message_passing(junc_tree, potentials, max_cliques):
-        #     message_dict = create_empty_message_dict(junc_tree)
+        def brute_force_message_passing(junc_tree, potentials, max_cliques):
+            message_dict = create_empty_message_dict(junc_tree)
+            while(True):
+                all_msgs = True
+                for m_clique in message_dict:
+                    for neigh in junc_tree[m_clique]:
+                        if message_dict[m_clique][neigh] == None:
+                            all_msgs = False
+                            prereqs_met = True
+                            for neigh1 in junc_tree[m_clique]:
+                                if neigh1 != neigh and message_dict[neigh1][m_clique] == None:
+                                    prereqs_met = False
+                                    break
+                            if not prereqs_met:
+                                continue
 
-        #     while(True):
-        #         all_msgs = True
-        #         for m_clique in message_dict:
-        #             for neigh in junc_tree[m_clique]:
-        #                 if message_dict[m_clique][neigh] == None:
-        #                     all_msgs = False
-        #                     prereqs_met = True
-        #                     for neigh1 in junc_tree[m_clique]:
-        #                         if neigh1 != neigh and message_dict[neigh1][m_clique] == None:
-        #                             prereqs_met = False
-        #                             break
-        #                     print(prereqs_met)
-        #                     if not prereqs_met:
-        #                         continue
+                            potn = deepcopy(potentials[m_clique])
+                            for neigh1 in junc_tree[m_clique]:
+                                if neigh1 != neigh:
+                                    potn = multiply_messages(potn, message_dict[neigh1][m_clique], m_clique, set(m_clique).intersection(neigh1))
+                            diff = set(m_clique).difference(neigh)
+                            summing_nodes = set(m_clique).difference(diff)
+                            message_dict[m_clique][neigh] = condense_message(potn, m_clique, summing_nodes, diff)
 
-        #                     potn = deepcopy(potentials[m_clique])
-        #                     for neigh1 in junc_tree[m_clique]:
-        #                         if neigh1 != neigh:
-        #                             potn = multiply_messages(potn, message_dict[neigh1][m_clique], m_clique, set(m_clique).intersection(neigh1))
-        #                     diff = set(m_clique).difference(neigh)
-        #                     summing_nodes = set(m_clique).difference(diff)
-        #                     message_dict[m_clique][neigh] = condense_message(potn, m_clique, summing_nodes, diff)
-
-        #         if all_msgs:
-        #             print("All messages sent")
-        #             print(message_dict)
-        #             break
+                if all_msgs:
+                    return message_dict
 
         # def multiply_potentials(potential1, potential2, potn1_depends_on, potn2_depends_on):
         #             potential_new = [None] * (2 ** (len(set(potn1_depends_on).union(potn2_depends_on))))
@@ -506,16 +502,16 @@ class Inference:
 
 
         # brut_force()
-        # brute_force_message_passing(self.junction_tree, self.max_clique_potentials, self.max_cliques)
-        message_dict = create_empty_message_dict(self.junction_tree)
+        message_dict = brute_force_message_passing(self.junction_tree, self.max_clique_potentials, self.max_cliques)
+        # message_dict = create_empty_message_dict(self.junction_tree)
         # print("Cliques and potentials:")
         # # print(self.clique_potentials)
-        # print("junction_tree:")
-        # print(self.junction_tree)
+        print("junction_tree:")
+        print(self.junction_tree)
         # # print("Maximal Clique Potentials:")
         # # print(self.max_clique_potentials)
-        dynamic_mem = send_message(self.junction_tree, self.max_clique_potentials, message_dict)
-        receive_message(self.junction_tree, self.max_clique_potentials, message_dict, dynamic_mem)
+        # dynamic_mem = send_message(self.junction_tree, self.max_clique_potentials, message_dict)
+        # receive_message(self.junction_tree, self.max_clique_potentials, message_dict, dynamic_mem)
         z = calc_z(message_dict, self.max_clique_potentials)
         print("message_dict:", message_dict)
         print("Z:", z)
@@ -601,7 +597,88 @@ class Inference:
 
         Refer to the sample test case for the expected format of the top-k assignments.
         """
-        pass
+
+        def create_empty_message_dict(junction_tree):
+            message_dict = {}
+            for node in junction_tree:
+                message_dict[node] = {}
+                for neighbor in junction_tree[node]:
+                    message_dict[node][neighbor] = None
+            return message_dict
+        
+        def multiply_messages(potential, message, node, mesg_depends_on):
+            potential_new = []
+            for pot in potential:
+                potential_new.append([])
+            for val in itertools.product([0, 1], repeat=len(node)):
+                assignmt = dict(zip(node, val))
+                targ_idx = 0
+                for t in mesg_depends_on:
+                    targ_idx = (targ_idx << 1) + assignmt[t]
+
+                node_idx = 0
+                for n in node:
+                    node_idx = (node_idx << 1) + assignmt[n]
+
+                potential_assignment = potential_new[node_idx]
+                message_assignment = message[targ_idx]
+
+                set_potential_assignment = set(potential_assignment[0][1].keys())
+                set_message_assignment = set(message_assignment[0][1].keys())
+
+                intersection = set_potential_assignment.intersection(set_message_assignment)
+                union = set_potential_assignment.union(set_message_assignment)
+
+                for pot_assignment in potential_assignment:
+                    for mesg_assignment in message_assignment:
+                        intersection_matches = True
+                        for var in intersection:
+                            if pot_assignment[1][var] != mesg_assignment[1][var]:
+                                intersection_matches = False
+                                break
+                        if intersection_matches:
+                            diff_dict = {var: pot_assignment[1][var] for var in union.difference(intersection)}
+                            new_assignment = deepcopy(pot_assignment)
+                            new_assignment[0] *= mesg_assignment[0]
+                            new_assignment[1].update(diff_dict)
+                            potential_new[node_idx].append(new_assignment)
+                
+            return potential_new
+        
+        def condense_message(potential, node, compl_to_topk_on, to_topk_on):
+            new_potential = []
+            for val in itertools.product([0, 1], repeat=len(compl_to_topk_on)):
+
+        
+        def brute_force_message_passing_top_k(junc_tree, potentials, max_cliques):
+            message_dict = create_empty_message_dict(junc_tree)
+            while(True):
+                all_msgs = True
+                for m_clique in message_dict:
+                    for neigh in junc_tree[m_clique]:
+                        if message_dict[m_clique][neigh] == None:
+                            all_msgs = False
+                            prereqs_met = True
+                            for neigh1 in junc_tree[m_clique]:
+                                if neigh1 != neigh and message_dict[neigh1][m_clique] == None:
+                                    prereqs_met = False
+                                    break
+                            if not prereqs_met:
+                                continue
+
+                            potn = deepcopy(potentials[m_clique])
+                            potn_message = []
+                            for pot in potn:
+                                potn_message.append([(pot, {})])
+
+                            for neigh1 in junc_tree[m_clique]:
+                                if neigh1 != neigh:
+                                    potn_message = multiply_messages(potn_message, message_dict[neigh1][m_clique], m_clique, set(m_clique).intersection(neigh1))
+                            diff = set(m_clique).difference(neigh)
+                            summing_nodes = set(m_clique).difference(diff)
+                            message_dict[m_clique][neigh] = condense_message(potn_message, m_clique, summing_nodes, diff)
+
+                            
 
 
 ########################################################################
@@ -645,6 +722,7 @@ class Get_Input_and_Check_Output:
 
 if __name__ == "__main__":
     # evaluator = Get_Input_and_Check_Output("Sample_Testcase.json")
-    evaluator = Get_Input_and_Check_Output("Testcases.json")
+    evaluator = Get_Input_and_Check_Output("Test.json")
+    # evaluator = Get_Input_and_Check_Output("Testcases.json")
     evaluator.get_output()
     evaluator.write_output("Sample_Testcase_Output.json")

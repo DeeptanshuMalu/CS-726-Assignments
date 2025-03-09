@@ -109,21 +109,23 @@ class DDPM(nn.Module):
         
         # Trainable time embedding
         time_emb_dim = 4
-        self.time_embedding = nn.Sequential(
+        self.time_embed = nn.Sequential(
             nn.Linear(1, time_emb_dim),
             nn.SiLU(),
             nn.Linear(time_emb_dim, time_emb_dim)
         )
-        hidden_dim = 4
+        hidden_dim = 128
         # MLP network
         self.fc1 = nn.Linear(n_dim + time_emb_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, n_dim)
         self.act = nn.SiLU()
+        self.n_dim = n_dim
+        self.n_steps = n_steps
 
     def forward(self, x_t, t):
         t = t.view(-1, 1)  # Ensure time is in the correct shape
-        t_emb = self.time_embedding(t)  # Trainable time embedding
+        t_emb = self.time_embed(t)  # Trainable time embedding
         x_t = torch.cat([x_t, t_emb], dim=-1)  # Concatenate time embedding with input
         h = self.act(self.fc1(x_t))
         h = self.act(self.fc2(h))
@@ -187,8 +189,8 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
             loss.backward()
             optimizer.step()
         print(f"Epoch {epoch}: Loss {total_loss}")
-        print(noise_pred, noise)
-        print("Cumulative difference", cumul_diff)
+        # print(noise_pred, noise)
+        # print("Cumulative difference", cumul_diff)
     
     torch.save(model.state_dict(), f'{run_name}/model.pth')
 
@@ -212,7 +214,23 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         Return: [[n_samples, n_dim]] x n_steps
         Optionally implement return_intermediate=True, will aid in visualizing the intermediate steps
     """   
-    pass
+    
+    n_dim = model.n_dim
+    init_sample = torch.randn((n_samples, n_dim)).to(device)
+    T = len(noise_scheduler)
+    all_samples = []
+    for t in range(T-1, -1, -1):
+        t_batch = torch.ones(n_samples).to(device)*t
+        z = torch.randn_like(init_sample).to(device)
+        alpha_t = 1-noise_scheduler.betas.to(device)[t].view(-1, 1)
+        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch)) + z
+        all_samples.append(init_sample)
+
+    if return_intermediate:
+        return all_samples
+    else:
+        return init_sample
 
 def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     """

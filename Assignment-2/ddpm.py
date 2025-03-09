@@ -168,11 +168,11 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
     for epoch in range(epochs):
         model.train()
         total_loss = 0
-        cumul_diff = torch.zeros_like(torch.concat([next(iter(dataloader))[0], next(iter(dataloader))[1].view(-1, 1)], dim=-1))
+        cumul_diff = torch.zeros_like(next(iter(dataloader))[0])
         for x, y in dataloader:
             x = x.to(device)
             y = y.to(device)
-            x = torch.concat([x, y.view(-1, 1)], dim=-1)
+            # x = torch.concat([x, y.view(-1, 1)], dim=-1)
             t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
             noise = torch.randn_like(x)
             noise.requires_grad = True

@@ -103,33 +103,131 @@ class NoiseScheduler():
 #         # print("x5", x)
 #         return x
 
+# class DDPM(nn.Module):
+#     def __init__(self, n_dim=2, n_steps=2000):
+#         super().__init__()
+        
+#         # Trainable time embedding
+#         time_emb_dim = 16
+#         self.time_embed = nn.Sequential(
+#             nn.Linear(1, time_emb_dim),
+#             nn.ReLU(),
+#             nn.Linear(time_emb_dim, time_emb_dim)
+#         )
+#         hidden_dim = 128
+#         # MLP network
+#         self.fc1 = nn.Linear(n_dim + time_emb_dim, hidden_dim)
+#         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+#         self.fc3 = nn.Linear(hidden_dim, n_dim)
+#         self.act = nn.ReLU()
+#         self.n_dim = n_dim
+#         self.n_steps = n_steps
+
+#     def forward(self, x_t, t):
+#         t = t.view(-1, 1)  # Ensure time is in the correct shape
+#         t_emb = self.time_embed(t)  # Trainable time embedding
+#         x_t = torch.cat([x_t, t_emb], dim=-1)  # Concatenate time embedding with input
+#         h = self.act(self.fc1(x_t))
+#         h = self.act(self.fc2(h))
+#         return self.fc3(h)  # Predict noise
+
+class ResNetBlock(nn.Module):
+    def __init__(self, n_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_dim, n_dim),
+            nn.ReLU(),
+            nn.Linear(n_dim, n_dim)
+        )
+
+    def forward(self, x):
+        return x + self.net(x)
+    
+class SinusoidalPositionEmbeddings(nn.Module):
+    def __init__(self, n_dim):
+        super().__init__()
+        self.n_dim = n_dim
+
+    def forward(self, time):
+        device = time.device
+        half_dim = self.n_dim // 2
+        embeddings = torch.exp(-torch.linspace(0, torch.log(torch.tensor(10000)), half_dim, device=device) / half_dim)
+        embeddings = time[:, None] * embeddings[None, :]
+        embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
+        return embeddings
+
 class DDPM(nn.Module):
     def __init__(self, n_dim=2, n_steps=2000):
         super().__init__()
         
         # Trainable time embedding
-        time_emb_dim = 4
-        self.time_embed = nn.Sequential(
-            nn.Linear(1, time_emb_dim),
-            nn.SiLU(),
-            nn.Linear(time_emb_dim, time_emb_dim)
-        )
+        time_emb_dim = 16
+        self.time_embed = SinusoidalPositionEmbeddings(time_emb_dim)
         hidden_dim = 128
-        # MLP network
-        self.fc1 = nn.Linear(n_dim + time_emb_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = nn.Linear(hidden_dim, n_dim)
-        self.act = nn.SiLU()
+        self.model = nn.Sequential(
+            nn.Linear(n_dim + time_emb_dim, hidden_dim),
+            nn.ReLU(),
+            ResNetBlock(hidden_dim),
+            ResNetBlock(hidden_dim),
+            ResNetBlock(hidden_dim),
+            nn.Linear(hidden_dim, n_dim)
+        )
         self.n_dim = n_dim
         self.n_steps = n_steps
 
     def forward(self, x_t, t):
-        t = t.view(-1, 1)  # Ensure time is in the correct shape
-        t_emb = self.time_embed(t)  # Trainable time embedding
-        x_t = torch.cat([x_t, t_emb], dim=-1)  # Concatenate time embedding with input
-        h = self.act(self.fc1(x_t))
-        h = self.act(self.fc2(h))
-        return self.fc3(h)  # Predict noise
+        t_emb = self.time_embed(t.view(-1, 1))  # Trainable time embedding
+        x_t = torch.cat([x_t, t_emb.view(-1, t_emb.shape[-1])], dim=-1)
+        return self.model(x_t)  # Predict noise
+
+# class SinusoidalPositionEmbeddings(nn.Module):
+#     def __init__(self, n_dim):
+#         super().__init__()
+#         self.n_dim = n_dim
+
+#     def forward(self, time):
+#         device = time.device
+#         half_dim = self.n_dim // 2
+#         embeddings = torch.exp(-torch.linspace(0, torch.log(torch.tensor(10000)), half_dim, device=device) / half_dim)
+#         embeddings = time[:, None] * embeddings[None, :]
+#         embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
+#         return embeddings
+    
+# class DDPM(nn.Module):
+#     def __init__(self, n_dim=2, n_steps=2000):
+#         super().__init__()
+#         self.n_dim = n_dim
+#         self.n_steps = n_steps
+
+#         time_embed_dim = 64
+#         self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
+
+#         hidden_dim = 128
+#         self.enc1 = nn.Conv1d(n_dim + time_embed_dim, hidden_dim, kernel_size=3, padding=1)
+#         self.enc2 = nn.Conv1d(hidden_dim, hidden_dim * 2, kernel_size=3, padding=1)
+
+#         self.bottleneck = nn.Conv1d(hidden_dim * 2, hidden_dim * 2, kernel_size=3, padding=1)
+
+#         self.dec2 = nn.Conv1d(hidden_dim * 2, hidden_dim, kernel_size=3, padding=1)
+#         self.dec1 = nn.Conv1d(hidden_dim, n_dim, kernel_size=3, padding=1)
+
+#     def forward(self, x, t):
+
+#         batch_size = x.shape[0]
+
+#         time_embeddings = self.time_embed(t).view(batch_size, -1, 1)
+
+#         x = torch.cat([x.unsqueeze(-1), time_embeddings], dim=1)
+
+#         e1 = F.relu(self.enc1(x))
+#         e2 = F.relu(self.enc2(e1))
+
+#         bottleneck = F.relu(self.bottleneck(e2))
+
+#         d2 = F.relu(self.dec2(bottleneck + e2))
+#         d1 = self.dec1(d2 + e1)
+
+#         return d1.squeeze(-1)
 
 class ConditionalDDPM():
     pass
@@ -164,11 +262,12 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
         run_name: str, path to save the model
     """
 
+    print(model)
+
     num_timesteps = len(noise_scheduler)
     for epoch in range(epochs):
         model.train()
         total_loss = 0
-        cumul_diff = torch.zeros_like(next(iter(dataloader))[0])
         for x, y in dataloader:
             x = x.to(device)
             y = y.to(device)
@@ -179,9 +278,8 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
             alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
             optimizer.zero_grad()
             xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-            t = t.float() / num_timesteps
+            t = t.float()
             noise_pred = model(xt, t)
-            cumul_diff += noise_pred - noise
             # print(noise_pred, noise)
             loss = F.mse_loss(noise_pred, noise)
             total_loss += loss.item()
@@ -189,9 +287,8 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
             loss.backward()
             optimizer.step()
         print(f"Epoch {epoch}: Loss {total_loss}")
-        # print(noise_pred, noise)
-        # print("Cumulative difference", cumul_diff)
-    
+        # print(noise_pred-noise)
+    print(run_name)
     torch.save(model.state_dict(), f'{run_name}/model.pth')
 
 @torch.no_grad()
@@ -217,15 +314,29 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
     
     n_dim = model.n_dim
     init_sample = torch.randn((n_samples, n_dim)).to(device)
+    # print(f"Initial sample {init_sample[0]}")
     T = len(noise_scheduler)
     all_samples = []
     for t in range(T-1, -1, -1):
         t_batch = torch.ones(n_samples).to(device)*t
-        z = torch.randn_like(init_sample).to(device)
         alpha_t = 1-noise_scheduler.betas.to(device)[t].view(-1, 1)
         alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
-        init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch)) + z
-        all_samples.append(init_sample)
+        z = torch.randn_like(init_sample, device=device)
+        # init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch)) + z * torch.sqrt(1-alpha_t)
+        init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch))
+        if t > 0:
+            sigma_t = torch.sqrt(1 - alpha_t) * torch.sqrt(noise_scheduler.betas.to(device)[t]).view(-1, 1)
+            init_sample = init_sample + z * sigma_t
+        all_samples.append(init_sample.clone())
+        
+        # print(f"Step {t}: init_sample {init_sample[0]}")
+        # print(f"Noise {z[0]}, Model {model(init_sample, t_batch)[0]}")
+
+    x1 = init_sample[:, 0].cpu().numpy()
+    x2 = init_sample[:, 1].cpu().numpy()
+    plt.scatter(x1, x2, s=1)
+    plt.savefig(f'{run_name}/samples_{args.seed}_{args.n_samples}.png')
+    plt.close()
 
     if return_intermediate:
         return all_samples

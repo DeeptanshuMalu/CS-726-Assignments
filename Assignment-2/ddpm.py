@@ -393,6 +393,13 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         plt.savefig(f'{run_name}/samples_{T}.png')
         plt.close()
 
+    # emd = utils.get_emd(data_X, init_sample.numpy())
+    nll = utils.get_nll(data_X, init_sample)
+
+    with open(f'{run_name}/metrics.txt', 'w') as f:
+        # f.write(f"EMD: {emd}\n")
+        f.write(f"NLL: {nll}\n")
+
     if return_intermediate:
         return all_samples
     else:
@@ -467,6 +474,10 @@ if __name__ == "__main__":
         train(model, noise_scheduler, dataloader, optimizer, epochs, run_name)
 
     elif args.mode == 'sample':
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        # can split the data into train and test -- for evaluation later
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
         model.load_state_dict(torch.load(f'{run_name}/model.pth'))
         samples = sample(model, args.n_samples, noise_scheduler)
         torch.save(samples, f'{run_name}/samples_{args.seed}_{args.n_samples}.pth')

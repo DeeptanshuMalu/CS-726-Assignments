@@ -12,6 +12,7 @@ def gaussian_kernel(x, x0, temperature=1e-1):
     exp_term = torch.sum(- 0.5 * (x - x0) ** 2, dim=1)
     main_term = torch.exp(exp_term / (2 * temperature))
     coeff = 1. / torch.sqrt(torch.Tensor([2 * torch.pi * temperature])) ** dim
+    coeff = coeff.to(x0.device)
     prod = coeff * main_term
     return torch.sum(prod) / x0.size(0)
 

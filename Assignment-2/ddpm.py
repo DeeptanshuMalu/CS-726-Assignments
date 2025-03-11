@@ -131,55 +131,18 @@ class NoiseScheduler():
 #         h = self.act(self.fc2(h))
 #         return self.fc3(h)  # Predict noise
 
-class ResNetBlock(nn.Module):
-    def __init__(self, n_dim):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_dim, n_dim),
-            nn.ReLU(),
-            nn.Linear(n_dim, n_dim)
-        )
+# class ResNetBlock(nn.Module):
+#     def __init__(self, n_dim):
+#         super().__init__()
+#         self.net = nn.Sequential(
+#             nn.Linear(n_dim, n_dim),
+#             nn.ReLU(),
+#             nn.Linear(n_dim, n_dim)
+#         )
 
-    def forward(self, x):
-        return x + self.net(x)
+#     def forward(self, x):
+#         return x + self.net(x)
     
-class SinusoidalPositionEmbeddings(nn.Module):
-    def __init__(self, n_dim):
-        super().__init__()
-        self.n_dim = n_dim
-
-    def forward(self, time):
-        device = time.device
-        half_dim = self.n_dim // 2
-        embeddings = torch.exp(-torch.linspace(0, torch.log(torch.tensor(10000)), half_dim, device=device) / half_dim)
-        embeddings = time[:, None] * embeddings[None, :]
-        embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
-        return embeddings
-
-class DDPM(nn.Module):
-    def __init__(self, n_dim=2, n_steps=2000):
-        super().__init__()
-        
-        # Trainable time embedding
-        time_emb_dim = 16
-        self.time_embed = SinusoidalPositionEmbeddings(time_emb_dim)
-        hidden_dim = 128
-        self.model = nn.Sequential(
-            nn.Linear(n_dim + time_emb_dim, hidden_dim),
-            nn.ReLU(),
-            ResNetBlock(hidden_dim),
-            ResNetBlock(hidden_dim),
-            ResNetBlock(hidden_dim),
-            nn.Linear(hidden_dim, n_dim)
-        )
-        self.n_dim = n_dim
-        self.n_steps = n_steps
-
-    def forward(self, x_t, t):
-        t_emb = self.time_embed(t.view(-1, 1))  # Trainable time embedding
-        x_t = torch.cat([x_t, t_emb.view(-1, t_emb.shape[-1])], dim=-1)
-        return self.model(x_t)  # Predict noise
-
 # class SinusoidalPositionEmbeddings(nn.Module):
 #     def __init__(self, n_dim):
 #         super().__init__()
@@ -192,6 +155,43 @@ class DDPM(nn.Module):
 #         embeddings = time[:, None] * embeddings[None, :]
 #         embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
 #         return embeddings
+
+# class DDPM(nn.Module):
+#     def __init__(self, n_dim=2, n_steps=2000):
+#         super().__init__()
+        
+#         # Trainable time embedding
+#         time_emb_dim = 16
+#         self.time_embed = SinusoidalPositionEmbeddings(time_emb_dim)
+#         hidden_dim = 128
+#         self.model = nn.Sequential(
+#             nn.Linear(n_dim + time_emb_dim, hidden_dim),
+#             nn.ReLU(),
+#             ResNetBlock(hidden_dim),
+#             ResNetBlock(hidden_dim),
+#             ResNetBlock(hidden_dim),
+#             nn.Linear(hidden_dim, n_dim)
+#         )
+#         self.n_dim = n_dim
+#         self.n_steps = n_steps
+
+#     def forward(self, x_t, t):
+#         t_emb = self.time_embed(t.view(-1, 1))  # Trainable time embedding
+#         x_t = torch.cat([x_t, t_emb.view(-1, t_emb.shape[-1])], dim=-1)
+#         return self.model(x_t)  # Predict noise
+
+class SinusoidalPositionEmbeddings(nn.Module):
+    def __init__(self, n_dim):
+        super().__init__()
+        self.n_dim = n_dim
+
+    def forward(self, time):
+        device = time.device
+        half_dim = self.n_dim // 2
+        embeddings = torch.exp(-torch.linspace(0, torch.log(torch.tensor(10000)), half_dim, device=device) / half_dim)
+        embeddings = time[:, None] * embeddings[None, :]
+        embeddings = torch.cat([torch.sin(embeddings), torch.cos(embeddings)], dim=-1)
+        return embeddings
     
 # class DDPM(nn.Module):
 #     def __init__(self, n_dim=2, n_steps=2000):
@@ -229,6 +229,42 @@ class DDPM(nn.Module):
 
 #         return d1.squeeze(-1)
 
+class DiffusionBlock(nn.Module):  # https://github.com/albarji/toy-diffusion/blob/master/swissRoll.ipynb
+    def __init__(self, nunits):
+        super(DiffusionBlock, self).__init__()
+        self.linear = nn.Linear(nunits, nunits)
+        
+    def forward(self, x: torch.Tensor):
+        x = self.linear(x)
+        x = nn.functional.relu(x)
+        return x
+        
+    
+class DDPM(nn.Module):
+    def __init__(self, n_dim=2, n_steps=2000):
+        super(DDPM, self).__init__()
+        
+        nunits = 128
+        nblocks = 5
+        time_embed_dim = 16
+
+        self.n_dim = n_dim
+        self.n_steps = n_steps
+        self.inblock = nn.Linear(n_dim+time_embed_dim, nunits)
+        self.midblocks = nn.ModuleList([DiffusionBlock(nunits) for _ in range(nblocks)])
+        self.outblock = nn.Linear(nunits, n_dim)
+
+        self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
+
+    def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        time_embed = self.time_embed(t).view(-1, self.time_embed.n_dim)
+        val = torch.hstack([x, time_embed])  # Add t to inputs
+        val = self.inblock(val)
+        for midblock in self.midblocks:
+            val = midblock(val)
+        val = self.outblock(val)
+        return val
+
 class ConditionalDDPM():
     pass
     
@@ -263,11 +299,14 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
     """
 
     print(model)
+    print(run_name)
 
     num_timesteps = len(noise_scheduler)
+    losses = []
     for epoch in range(epochs):
         model.train()
         total_loss = 0
+        batch_count = 0
         for x, y in dataloader:
             x = x.to(device)
             y = y.to(device)
@@ -278,7 +317,7 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
             alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
             optimizer.zero_grad()
             xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-            t = t.float()
+            t = t.float().reshape(-1, 1)
             noise_pred = model(xt, t)
             # print(noise_pred, noise)
             loss = F.mse_loss(noise_pred, noise)
@@ -286,9 +325,12 @@ def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
             # print(f"Loss {loss.item()}")
             loss.backward()
             optimizer.step()
-        print(f"Epoch {epoch}: Loss {total_loss}")
+            batch_count += 1
+        print(f"Epoch {epoch}: Loss {total_loss/batch_count}")
+        losses.append(total_loss/batch_count)
         # print(noise_pred-noise)
-    print(run_name)
+    plt.plot(losses)
+    plt.savefig(f'{run_name}/train_loss.png')
     torch.save(model.state_dict(), f'{run_name}/model.pth')
 
 @torch.no_grad()
@@ -323,20 +365,33 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
         z = torch.randn_like(init_sample, device=device)
         # init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch)) + z * torch.sqrt(1-alpha_t)
+        t_batch = t_batch.float().reshape(-1, 1)
         init_sample = 1/torch.sqrt(alpha_t) * (init_sample - (1-alpha_t)/torch.sqrt(1-alpha_bar_t) * model(init_sample, t_batch))
         if t > 0:
-            sigma_t = torch.sqrt(1 - alpha_t) * torch.sqrt(noise_scheduler.betas.to(device)[t]).view(-1, 1)
+            sigma_t = torch.sqrt(1 - alpha_t)
             init_sample = init_sample + z * sigma_t
         all_samples.append(init_sample.clone())
         
         # print(f"Step {t}: init_sample {init_sample[0]}")
         # print(f"Noise {z[0]}, Model {model(init_sample, t_batch)[0]}")
 
-    x1 = init_sample[:, 0].cpu().numpy()
-    x2 = init_sample[:, 1].cpu().numpy()
-    plt.scatter(x1, x2, s=1)
-    plt.savefig(f'{run_name}/samples_{args.seed}_{args.n_samples}.png')
-    plt.close()
+    if init_sample.shape[1] == 2:
+        x1 = init_sample[:, 0].cpu().numpy()
+        x2 = init_sample[:, 1].cpu().numpy()
+        plt.scatter(x1, x2, s=1)
+        plt.title(f"Samples at t={T}")
+        plt.savefig(f'{run_name}/samples_{T}.png')
+        plt.close()
+    elif init_sample.shape[1] == 3:
+        x1 = init_sample[:, 0].cpu().numpy()
+        x2 = init_sample[:, 1].cpu().numpy()
+        x3 = init_sample[:, 2].cpu().numpy()
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(x1, x2, x3, s=1)
+        plt.title(f"Samples at t={T}")
+        plt.savefig(f'{run_name}/samples_{T}.png')
+        plt.close()
 
     if return_intermediate:
         return all_samples

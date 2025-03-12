@@ -393,11 +393,22 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         plt.savefig(f'{run_name}/samples_{T}.png')
         plt.close()
 
-    # emd = utils.get_emd(data_X, init_sample.numpy())
+    subsample_size = 250
+    emd_list = []
+    for i in range(5):
+        subsample_data_X = utils.sample(data_X.to("cpu").numpy(), size = subsample_size)
+        subsample_samples = utils.sample(init_sample.to("cpu").numpy(), size = subsample_size)
+        emd = utils.get_emd(subsample_data_X, subsample_samples)
+        print(f'{i} EMD {emd}')
+        emd_list.append(emd)
+    emd_avg = sum(emd_list)/len(emd_list)
+    print(f"EMD: {emd_avg}")
+
     nll = utils.get_nll(data_X, init_sample)
+    print(f"NLL: {nll}")
 
     with open(f'{run_name}/metrics.txt', 'w') as f:
-        # f.write(f"EMD: {emd}\n")
+        f.write(f"EMD: {emd_avg}\n")
         f.write(f"NLL: {nll}\n")
 
     if return_intermediate:
@@ -469,6 +480,8 @@ if __name__ == "__main__":
         data_X, data_y = dataset.load_dataset(args.dataset)
         # can split the data into train and test -- for evaluation later
         data_X = data_X.to(device)
+        if data_y == None:
+            data_y = torch.zeros(data_X.shape[0])
         data_y = data_y.to(device)
         dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_X, data_y), batch_size=args.batch_size, shuffle=True)
         train(model, noise_scheduler, dataloader, optimizer, epochs, run_name)
@@ -478,6 +491,8 @@ if __name__ == "__main__":
         # can split the data into train and test -- for evaluation later
         data_X = data_X.to(device)
         data_y = data_y.to(device)
+        if data_y == None:
+            data_y = torch.zeros(data_X.shape[0])
         model.load_state_dict(torch.load(f'{run_name}/model.pth'))
         samples = sample(model, args.n_samples, noise_scheduler)
         torch.save(samples, f'{run_name}/samples_{args.seed}_{args.n_samples}.pth')

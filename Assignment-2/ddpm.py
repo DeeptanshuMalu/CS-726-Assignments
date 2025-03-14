@@ -97,8 +97,33 @@ class DDPM(nn.Module):
         val = self.outblock(val)
         return val
 
-class ConditionalDDPM():
-    pass
+class ConditionalDDPM(nn.Module):
+    def __init__(self, n_dim=2, n_steps=200):
+        super(ConditionalDDPM, self).__init__()
+        
+        nunits = 128
+        nblocks = 5
+        time_embed_dim = 16
+        class_embed_dim = 16
+
+        self.n_dim = n_dim
+        self.n_steps = n_steps
+        self.inblock = nn.Linear(n_dim+time_embed_dim+class_embed_dim, nunits)
+        self.midblocks = nn.ModuleList([DiffusionBlock(nunits) for _ in range(nblocks)])
+        self.outblock = nn.Linear(nunits, n_dim)
+
+        self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
+        self.class_embed = SinusoidalPositionEmbeddings(class_embed_dim)
+
+    def forward(self, x: torch.Tensor, t: torch.Tensor, class_label: torch.Tensor) -> torch.Tensor:
+        class_embed = self.class_embed(class_label).view(-1, self.class_embed.n_dim)
+        time_embed = self.time_embed(t).view(-1, self.time_embed.n_dim)
+        val = torch.hstack([x, time_embed, class_embed])
+        val = self.inblock(val)
+        for midblock in self.midblocks:
+            val = midblock(val)
+        val = self.outblock(val)
+        return val
     
 class ClassifierDDPM():
     """

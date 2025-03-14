@@ -461,7 +461,22 @@ We observe a clear trade-off between sample quality (measured by EMD) and condit
     \label{fig:guidance_helix}
 \end{figure}
 
+\subsection{Training Free Classifier}
 
+For this we are using the KNN classifier with 100 neighbors. The classifier uses 20000 samples made using the ConditionalDDPM model.
+We are comparing its performance with an MLP classifier with 2 hidden layers of 100 and 50 units respectively.
+
+\begin{longtable}{|l|c|c|}
+    \hline
+    \textbf{Dataset} & \textbf{KNN} & \textbf{MLP} \\
+    \hline
+    Moons & 1.00 & 1.00 \\
+    Circles & 0.99 & 1.00 \\
+    Blobs & 0.87 & 0.86 \\
+    Manycircles & 0.95 & 0.97 \\
+    Helix & 0.77 & 0.80 \\
+    \hline
+\end{longtable}
 
 % \section*{Acknowledgements}
 

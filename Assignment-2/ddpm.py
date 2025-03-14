@@ -182,7 +182,8 @@ class ClassifierDDPM:
     """
 
     def __init__(self, model: ConditionalDDPM, noise_scheduler: NoiseScheduler):
-        pass
+        self.model = model
+        self.noise_scheduler = noise_scheduler
 
     def __call__(self, x):
         pass
@@ -194,7 +195,24 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted class tensor [batch_size]
         """
-        pass
+        num_timesteps = len(self.noise_scheduler)
+        t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
+        noise = torch.randn_like(x)
+        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        optimizer.zero_grad()
+        xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
+        t = t.float().reshape(-1, 1)
+        losses = []
+        for c in range(self.model.n_classes):
+            y = torch.ones(x.shape[0], device=device) * c
+            y = y.float().reshape(-1, 1)
+            noise_pred = model(xt, t, y)
+            loss = F.mse_loss(noise_pred, noise)
+            losses.append(loss.item())
+
+        losses = torch.tensor(losses)
+
+        return torch.argmin(losses, dim=0)
 
     def predict_proba(self, x):
         """
@@ -203,7 +221,24 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted probabilites for each class  [batch_size, n_classes]
         """
-        pass
+        num_timesteps = len(self.noise_scheduler)
+        t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
+        noise = torch.randn_like(x)
+        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        optimizer.zero_grad()
+        xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
+        t = t.float().reshape(-1, 1)
+        losses = []
+        for c in range(self.model.n_classes):
+            y = torch.ones(x.shape[0], device=device) * c
+            y = y.float().reshape(-1, 1)
+            noise_pred = model(xt, t, y)
+            loss = F.mse_loss(noise_pred, noise)
+            losses.append(loss.item())
+
+        losses = torch.tensor(losses)
+
+        return F.softmax(-losses, dim=0)
 
 
 def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):
@@ -517,7 +552,7 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg"], default="sample")
+    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg", "classify"], default="sample")
     parser.add_argument("--n_steps", type=int, default=None)
     parser.add_argument("--lbeta", type=float, default=None)
     parser.add_argument("--ubeta", type=float, default=None)
@@ -648,6 +683,24 @@ if __name__ == "__main__":
         with open(f"{run_name}/metrics_cfg_{args.guidance_scale}.txt", "w") as f:
             f.write(f"EMD: {emd_avg}\n")
             f.write(f"Accuracy: {acc}\n")
+
+    elif args.mode == "classify":
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
+        n_classes = len(torch.unique(data_y))
+
+        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
+        clf_ddpm = ClassifierDDPM(model, noise_scheduler)
+        y_pred = clf_ddpm.predict(data_X)
+        acc_ddpm = torch.mean((y_pred == data_y).float())
+        print(f"Accuracy of DDPM classifier: {acc_ddpm}")
+
+        model_filename = f"classifier_models/{args.dataset}_mlp_model.pkl"
+        clf = joblib.load(model_filename)
+        acc_classical = clf.score(data_X.cpu().numpy(), data_y.cpu().numpy())
+        print(f"Accuracy of classical classifier: {acc_classical}")
 
     else:
         raise ValueError(f"Invalid mode {args.mode}")

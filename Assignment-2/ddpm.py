@@ -84,6 +84,15 @@ class DiffusionBlock(nn.Module):
 
 class DDPM(nn.Module):
     def __init__(self, n_dim=2, n_steps=200):
+        """
+        Noise prediction network for the DDPM
+
+        Args:
+            n_dim: int, the dimensionality of the data
+            n_steps: int, the number of steps in the diffusion process
+        We have separate learnable modules for `time_embed` and `model`. `time_embed` can be learned or a fixed function as well
+
+        """
         super(DDPM, self).__init__()
 
         nunits = 128
@@ -98,7 +107,15 @@ class DDPM(nn.Module):
 
         self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
 
-    def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+    def forward(self, x, t):
+        """
+        Args:
+            x: torch.Tensor, the input data tensor [batch_size, n_dim]
+            t: torch.Tensor, the timestep tensor [batch_size]
+
+        Returns:
+            torch.Tensor, the predicted noise tensor [batch_size, n_dim]
+        """
         time_embed = self.time_embed(t).view(-1, self.time_embed.n_dim)
         val = torch.hstack([x, time_embed])  # Add t to inputs
         val = self.inblock(val)
@@ -110,6 +127,16 @@ class DDPM(nn.Module):
 
 class ConditionalDDPM(nn.Module):
     def __init__(self, n_dim=2, n_steps=200):
+        """
+        Class dependernt noise prediction network for the DDPM
+
+        Args:
+            n_classes: number of classes in the dataset
+            n_dim: int, the dimensionality of the data
+            n_steps: int, the number of steps in the diffusion process
+        We have separate learnable modules for `time_embed` and `model`. `time_embed` can be learned or a fixed function as well
+
+        """
         super(ConditionalDDPM, self).__init__()
 
         nunits = 128
@@ -126,10 +153,16 @@ class ConditionalDDPM(nn.Module):
         self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
         self.class_embed = SinusoidalPositionEmbeddings(class_embed_dim)
 
-    def forward(
-        self, x: torch.Tensor, t: torch.Tensor, class_label: torch.Tensor
-    ) -> torch.Tensor:
-        class_embed = self.class_embed(class_label).view(-1, self.class_embed.n_dim)
+    def forward(self, x, t, y):
+        """
+        Args:
+            x: torch.Tensor, the input data tensor [batch_size, n_dim]
+            t: torch.Tensor, the timestep tensor [batch_size]
+            y: torch.Tensor, the class label tensor [batch_size]
+        Returns:
+            torch.Tensor, the predicted noise tensor [batch_size, n_dim]
+        """
+        class_embed = self.class_embed(y).view(-1, self.class_embed.n_dim)
         time_embed = self.time_embed(t).view(-1, self.time_embed.n_dim)
         val = torch.hstack([x, time_embed, class_embed])
         val = self.inblock(val)
@@ -151,9 +184,21 @@ class ClassifierDDPM:
         pass
 
     def predict(self, x):
+        """
+        Args:
+            x: torch.Tensor, the input data tensor [batch_size, n_dim]
+        Returns:
+            torch.Tensor, the predicted class tensor [batch_size]
+        """
         pass
 
     def predict_proba(self, x):
+        """
+        Args:
+            x: torch.Tensor, the input data tensor [batch_size, n_dim]
+        Returns:
+            torch.Tensor, the predicted probabilites for each class  [batch_size, n_classes]
+        """
         pass
 
 
@@ -350,7 +395,10 @@ if __name__ == "__main__":
 
     model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps)
     noise_scheduler = NoiseScheduler(
-        num_timesteps=args.n_steps, beta_start=args.lbeta, beta_end=args.ubeta, type=args.scheduler
+        num_timesteps=args.n_steps,
+        beta_start=args.lbeta,
+        beta_end=args.ubeta,
+        type=args.scheduler,
     )
     model = model.to(device)
 

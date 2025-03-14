@@ -1,0 +1,5 @@
+CUDA_VISIBLE_DEVICES=1 python ddpm.py --mode sample_conditional --dataset moons --n_steps 150 --n_dim 2 --lbeta 0.0001 --ubeta 0.02 --epochs 100 --batch_size 64 --lr 0.001 --p_uncond 0.2 --n_samples 20000
+CUDA_VISIBLE_DEVICES=1 python ddpm.py --mode sample_conditional --dataset circles --n_steps 150 --n_dim 2 --lbeta 0.0001 --ubeta 0.02 --epochs 100 --batch_size 64 --lr 0.001 --p_uncond 0.2 --n_samples 20000
+CUDA_VISIBLE_DEVICES=1 python ddpm.py --mode sample_conditional --dataset manycircles --n_steps 150 --n_dim 2 --lbeta 0.0001 --ubeta 0.02 --epochs 100 --batch_size 64 --lr 0.001 --p_uncond 0.2 --n_samples 20000
+CUDA_VISIBLE_DEVICES=1 python ddpm.py --mode sample_conditional --dataset blobs --n_steps 150 --n_dim 2 --lbeta 0.0001 --ubeta 0.02 --epochs 100 --batch_size 64 --lr 0.001 --p_uncond 0.2 --n_samples 20000
+CUDA_VISIBLE_DEVICES=1 python ddpm.py --mode sample_conditional --dataset helix --n_steps 150 --n_dim 3 --lbeta 0.0001 --ubeta 0.02 --epochs 100 --batch_size 64 --lr 0.001 --p_uncond 0.2 --n_samples 20000

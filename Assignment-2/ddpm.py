@@ -8,7 +8,10 @@ import torch.nn.functional as F
 import utils
 import dataset
 import os
+import joblib
+from sklearn.neural_network import MLPClassifier
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class NoiseScheduler:
@@ -126,7 +129,7 @@ class DDPM(nn.Module):
 
 
 class ConditionalDDPM(nn.Module):
-    def __init__(self, n_dim=2, n_steps=200):
+    def __init__(self, n_classes=2, n_dim=2, n_steps=200):
         """
         Class dependernt noise prediction network for the DDPM
 
@@ -146,6 +149,7 @@ class ConditionalDDPM(nn.Module):
 
         self.n_dim = n_dim
         self.n_steps = n_steps
+        self.n_classes = n_classes
         self.inblock = nn.Linear(n_dim + time_embed_dim + class_embed_dim, nunits)
         self.midblocks = nn.ModuleList([DiffusionBlock(nunits) for _ in range(nblocks)])
         self.outblock = nn.Linear(nunits, n_dim)
@@ -336,7 +340,103 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
     else:
         return init_sample
 
+def trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, p_uncond=0.5):
+    print(model)
+    print(run_name)
 
+    num_timesteps = len(noise_scheduler)
+    n_classes = model.n_classes
+
+    losses = []
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        batch_count = 0
+        for x, y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+            t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
+            uncond = torch.rand(x.shape[0], device=device) < p_uncond
+            y = torch.where(uncond, torch.ones_like(y) * n_classes, y)
+            noise = torch.randn_like(x)
+            noise.requires_grad = True
+            alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+            optimizer.zero_grad()
+            xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
+            t = t.float().reshape(-1, 1)
+            y = y.float().reshape(-1, 1)
+            noise_pred = model(xt, t, y)
+            loss = F.mse_loss(noise_pred, noise)
+            total_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+            batch_count += 1
+        print(f"Epoch {epoch}: Loss {total_loss/batch_count}")
+        losses.append(total_loss / batch_count)
+    plt.plot(losses)
+    plt.savefig(f"{run_name}/train_loss_conditional.png")
+    torch.save(model.state_dict(), f"{run_name}/model_conditional.pth")
+
+@torch.no_grad()
+def sampleConditional(model, n_samples, noise_scheduler):
+    n_dim = model.n_dim
+    n_classes = model.n_classes
+    n_samples_per_class = n_samples // n_classes
+    T = len(noise_scheduler)
+    samples = []
+    ys = []
+        
+    for c in range(n_classes):
+        y = torch.ones(n_samples_per_class).to(device) * c
+        ys.append(y)
+        init_sample = torch.randn((n_samples_per_class, n_dim)).to(device)
+        for t in range(T - 1, -1, -1):
+            t_batch = torch.ones(n_samples_per_class).to(device) * t
+            alpha_t = 1 - noise_scheduler.betas.to(device)[t].view(-1, 1)
+            alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+            z = torch.randn_like(init_sample, device=device)
+            t_batch = t_batch.float().reshape(-1, 1)
+            y = y.float().reshape(-1, 1)
+            init_sample = (
+                1
+                / torch.sqrt(alpha_t)
+                * (
+                    init_sample
+                    - (1 - alpha_t)
+                    / torch.sqrt(1 - alpha_bar_t)
+                    * model(init_sample, t_batch, y)
+                )
+            )
+            if t > 0:
+                sigma_t = torch.sqrt(1 - alpha_t)
+                init_sample = init_sample + z * sigma_t
+
+
+        samples.append(init_sample.clone())
+
+
+
+    samples = torch.vstack(samples)
+    ys = torch.cat(ys)
+
+    if samples.shape[1] == 2:
+        x1 = samples[:, 0].cpu().numpy()
+        x2 = samples[:, 1].cpu().numpy()
+        plt.scatter(x1, x2, s=1, c=ys.cpu().numpy())
+    elif samples.shape[1] == 3:
+        x1 = samples[:, 0].cpu().numpy()
+        x2 = samples[:, 1].cpu().numpy()
+        x3 = samples[:, 2].cpu().numpy()
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.scatter(x1, x2, x3, s=1, c=ys.cpu().numpy())
+    plt.title(f"Samples at t={T}")
+    plt.savefig(f"{run_name}/samples_conditional_{T}.png")
+    plt.close()
+
+    return samples, ys
+
+@torch.no_grad()
 def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     """
     Sample from the conditional model
@@ -351,8 +451,51 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     Returns:
         torch.Tensor, samples from the model [n_samples, n_dim]
     """
-    pass
+    n_dim = model.n_dim
+    n_classes = model.n_classes
+    n_samples_per_class = n_samples // n_classes
+    T = len(noise_scheduler)
+    y = torch.ones(n_samples_per_class).to(device) * class_label
+    y_uncond = torch.ones(n_samples_per_class).to(device) * n_classes
+    init_sample = torch.randn((n_samples_per_class, n_dim)).to(device)
+    for t in range(T - 1, -1, -1):
+        t_batch = torch.ones(n_samples_per_class).to(device) * t
+        alpha_t = 1 - noise_scheduler.betas.to(device)[t].view(-1, 1)
+        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        z = torch.randn_like(init_sample, device=device)
+        t_batch = t_batch.float().reshape(-1, 1)
+        y = y.float().reshape(-1, 1)
+        y_uncond = y_uncond.float().reshape(-1, 1)
+        guided_eps = (1+guidance_scale) * model(init_sample, t_batch, y) - guidance_scale * model(init_sample, t_batch, y_uncond)
+        init_sample = (
+            1
+            / torch.sqrt(alpha_t)
+            * (
+                init_sample
+                - (1 - alpha_t)
+                / torch.sqrt(1 - alpha_bar_t)
+                * guided_eps
+            )
+        )
+        if t > 0:
+            sigma_t = torch.sqrt(1 - alpha_t)
+            init_sample = init_sample + z * sigma_t
 
+    subsample_size = 250
+    emd_list = []
+    data_X_class = data_X[data_y == class_label]
+    for i in range(5):
+        subsample_data_X = utils.sample(data_X_class.to("cpu").numpy(), size=subsample_size)
+        subsample_samples = utils.sample(
+            init_sample.to("cpu").numpy(), size=subsample_size
+        )
+        emd = utils.get_emd(subsample_data_X, subsample_samples)
+        print(f"{i} EMD_{class_label}: {emd}")
+        emd_list.append(emd)
+    emd_avg = sum(emd_list) / len(emd_list)
+    print(f"EMD_{class_label}: {emd_avg}")
+
+    return init_sample, emd_avg
 
 def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     """
@@ -374,7 +517,7 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["train", "sample"], default="sample")
+    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg"], default="sample")
     parser.add_argument("--n_steps", type=int, default=None)
     parser.add_argument("--lbeta", type=float, default=None)
     parser.add_argument("--ubeta", type=float, default=None)
@@ -386,6 +529,8 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--n_dim", type=int, default=None)
     parser.add_argument("--scheduler", type=str, default="linear")
+    parser.add_argument("--p_uncond", type=float, default=0.5)
+    parser.add_argument("--guidance_scale", type=float, default=1.0)
 
     args = parser.parse_args()
     utils.seed_everything(args.seed)
@@ -428,5 +573,81 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(f"{run_name}/model.pth"))
         samples = sample(model, args.n_samples, noise_scheduler)
         torch.save(samples, f"{run_name}/samples_{args.seed}_{args.n_samples}.pth")
+
+    elif args.mode == "train_conditional":
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
+        n_classes = len(torch.unique(data_y))
+        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        epochs = args.epochs
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        dataloader = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(data_X, data_y),
+            batch_size=args.batch_size,
+            shuffle=True,
+        )
+        trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, p_uncond=args.p_uncond)\
+        
+    elif args.mode == "sample_conditional":
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
+        n_classes = len(torch.unique(data_y))
+        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
+        samples, ys = sampleConditional(model, args.n_samples, noise_scheduler)
+        torch.save(samples, f"{run_name}/samples_conditional_{args.seed}_{args.n_samples}.pth")
+        torch.save(ys, f"{run_name}/labels_conditional_{args.seed}_{args.n_samples}.pth")
+
+    elif args.mode == "sample_cfg":
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
+        n_classes = len(torch.unique(data_y))
+        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
+        samples = []
+        emds = []
+        ys = []
+        for c in range(n_classes):
+            init_sample, emd = sampleCFG(model, args.n_samples, noise_scheduler, args.guidance_scale, c)
+            samples.append(init_sample)
+            emds.append(emd)
+            ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
+
+        samples = torch.vstack(samples)
+        emd_avg = sum(emds) / len(emds)
+        ys = torch.cat(ys)
+
+        torch.save(samples, f"{run_name}/samples_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth")
+        torch.save(ys, f"{run_name}/labels_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth")
+
+        T = len(noise_scheduler)
+        if samples.shape[1] == 2:
+            x1 = samples[:, 0].cpu().numpy()
+            x2 = samples[:, 1].cpu().numpy()
+            plt.scatter(x1, x2, s=1, c=ys.cpu().numpy())
+        elif samples.shape[1] == 3:
+            x1 = samples[:, 0].cpu().numpy()
+            x2 = samples[:, 1].cpu().numpy()
+            x3 = samples[:, 2].cpu().numpy()
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            ax.scatter(x1, x2, x3, s=1, c=ys.cpu().numpy())
+        plt.title(f"Samples at t={T}, guidance_scale={args.guidance_scale}")
+        plt.savefig(f"{run_name}/samples_cfg_{T}_{args.guidance_scale}.png")
+        plt.close()
+
+        model_filename = f"classifier_models/{args.dataset}_mlp_model.pkl"
+        clf = joblib.load(model_filename)
+
+        ys_pred = clf.predict(samples.cpu().numpy())
+        acc = np.mean(ys_pred == ys.cpu().numpy())
+        print(f"Accuracy: {acc}")
+        with open(f"{run_name}/metrics_cfg_{args.guidance_scale}.txt", "w") as f:
+            f.write(f"EMD: {emd_avg}\n")
+            f.write(f"Accuracy: {acc}\n")
+
     else:
         raise ValueError(f"Invalid mode {args.mode}")

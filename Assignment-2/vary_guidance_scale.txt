@@ -1,0 +1,110 @@
+ddpm_2_150_0.0001_0.02_moons:
+guidance_scale: 0.25
+EMD: 27.233713048727324
+Accuracy: 0.9999
+
+guidance_scale: 0.5
+EMD: 31.76546823830259
+Accuracy: 1.0
+
+guidance_scale: 1.0
+EMD: 44.5658044073987
+Accuracy: 1.0
+
+guidance_scale: 2.0
+EMD: 63.592788030781804
+Accuracy: 1.0
+
+guidance_scale: 4.0
+EMD: 82.61711354245585
+Accuracy: 1.0
+
+
+ddpm_2_150_0.0001_0.02_circles:
+guidance_scale: 0.25
+EMD: 40.599554187445165
+Accuracy: 0.9737
+
+guidance_scale: 0.5
+EMD: 40.3255863924327
+Accuracy: 0.9892
+
+guidance_scale: 1.0
+EMD: 40.65088351397414
+Accuracy: 0.99785
+
+guidance_scale: 2.0
+EMD: 42.87402718591488
+Accuracy: 0.99995
+
+guidance_scale: 4.0
+EMD: 56.29691672612631
+Accuracy: 1.0
+
+
+ddpm_2_150_0.0001_0.02_blobs:
+guidance_scale: 0.25
+EMD: 20.265370721491006
+Accuracy: 0.95375
+
+guidance_scale: 0.5
+EMD: 26.159926103307072
+Accuracy: 0.9758
+
+guidance_scale: 1.0
+EMD: 39.272884212756196
+Accuracy: 0.99415
+
+guidance_scale: 2.0
+EMD: 55.48344794708367
+Accuracy: 0.999
+
+guidance_scale: 4.0
+EMD: 77.68708125227295
+Accuracy: 0.99825
+
+
+ddpm_2_150_0.0001_0.02_manycircles:
+guidance_scale: 0.25
+EMD: 12.163432289507188
+Accuracy: 0.91885
+
+guidance_scale: 0.5
+EMD: 14.619387121737535
+Accuracy: 0.9555
+
+guidance_scale: 1.0
+EMD: 18.9724449896201
+Accuracy: 0.98445
+
+guidance_scale: 2.0
+EMD: 25.13617232260425
+Accuracy: 0.99665
+
+guidance_scale: 4.0
+EMD: 34.04103914463809
+Accuracy: 0.99955
+
+
+ddpm_3_150_0.0001_0.02_helix:
+guidance_scale: 0.25
+EMD: 56.82161920512367
+Accuracy: 0.72975
+
+guidance_scale: 0.5
+EMD: 58.133633107006474
+Accuracy: 0.76445
+
+guidance_scale: 1.0
+EMD: 63.17347686817568
+Accuracy: 0.8159
+
+guidance_scale: 2.0
+EMD: 74.67361628014649
+Accuracy: 0.8836
+
+guidance_scale: 4.0
+EMD: 97.19447368014342
+Accuracy: 0.9375
+
+

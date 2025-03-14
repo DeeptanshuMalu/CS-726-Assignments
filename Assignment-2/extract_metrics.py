@@ -21,8 +21,10 @@ DATASETS = [
     "helix",
 ]
 
+GUIDANCE_SCALES = [0.25, 0.5, 1.0, 2.0, 4.0]
+
 if __name__ == "__main__":
-    with open("var_timesteps.txt", "w") as f:
+    with open("vary_timesteps.txt", "w") as f:
         for step in STEPS_VALUES:
             ubeta = 0.02
             lbeta = 0.0001
@@ -40,7 +42,7 @@ if __name__ == "__main__":
                     f.write(f"{runname[5:]}:\n{metrics_content}\n")
                     f.write("\n")
 
-    with open("var_beta.txt", "w") as f:
+    with open("vary_beta.txt", "w") as f:
         for lbeta, ubeta in BETA_PAIRS:
             step = 200
             for dataset in DATASETS:
@@ -56,3 +58,26 @@ if __name__ == "__main__":
                     metrics_content = metrics_f.read().strip()
                     f.write(f"{runname[5:]}:\n{metrics_content}\n")
                     f.write("\n")
+
+    with open("vary_guidance_scale.txt", "w") as f:
+        step = 150
+        lbeta = 0.0001
+        ubeta = 0.02
+        for dataset in DATASETS:
+            if dataset == "helix":
+                dim = 3
+            else:
+                dim = 2
+            runname = f"exps/ddpm_{dim}_{step}_{lbeta}_{ubeta}_{dataset}"
+            metrics_content = f"{runname[5:]}:\n"
+            
+            for guidance_scale in GUIDANCE_SCALES:
+                file_path = os.path.join(runname, f"metrics_cfg_{guidance_scale}.txt")
+                with open(file_path, "r") as metrics_f:
+                    metrics_content += "guidance_scale: " + str(guidance_scale) + "\n"
+                    metrics_content += metrics_f.read().strip()
+                    metrics_content += "\n\n"
+
+            metrics_content += "\n"
+            
+            f.write(metrics_content)

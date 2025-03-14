@@ -340,6 +340,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--n_dim", type=int, default=None)
+    parser.add_argument("--scheduler", type=str, default="linear")
 
     args = parser.parse_args()
     utils.seed_everything(args.seed)
@@ -349,7 +350,7 @@ if __name__ == "__main__":
 
     model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps)
     noise_scheduler = NoiseScheduler(
-        num_timesteps=args.n_steps, beta_start=args.lbeta, beta_end=args.ubeta
+        num_timesteps=args.n_steps, beta_start=args.lbeta, beta_end=args.ubeta, type=args.scheduler
     )
     model = model.to(device)
 

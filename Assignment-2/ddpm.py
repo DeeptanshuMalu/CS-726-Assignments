@@ -12,7 +12,7 @@ import joblib
 from sklearn.neural_network import MLPClassifier
 import matplotlib.pyplot as plt
 import numpy as np
-
+from sklearn.neighbors import KNeighborsClassifier
 
 class NoiseScheduler:
     """
@@ -34,6 +34,10 @@ class NoiseScheduler:
 
         if type == "linear":
             self.init_linear_schedule(**kwargs)
+        elif type == "cosine":
+            self.init_cosine_schedule(**kwargs)
+        elif type == "sigmoid":
+            self.init_sigmoid_schedule(**kwargs)
         else:
             raise NotImplementedError(
                 f"{type} scheduler is not implemented"
@@ -47,6 +51,29 @@ class NoiseScheduler:
         self.betas = torch.linspace(
             beta_start, beta_end, self.num_timesteps, dtype=torch.float32
         )
+
+        self.alphas = torch.cumprod(1 - self.betas, dim=0)
+
+    def init_cosine_schedule(self, beta_start, beta_end):
+        """
+        Precompute whatever quantities are required for training and sampling
+        """
+        vals = 1 - torch.cos(
+            torch.linspace(0, np.pi / 2, self.num_timesteps)
+        ) ** 2
+
+        self.betas = beta_start + (beta_end - beta_start) * vals
+
+        self.alphas = torch.cumprod(1 - self.betas, dim=0)
+
+    def init_sigmoid_schedule(self, beta_start, beta_end):
+        """
+        Precompute whatever quantities are required for training and sampling
+        """
+
+        self.betas = 1 / (1 + torch.exp(
+            -torch.linspace(-3, 3, self.num_timesteps)
+        )) * (beta_end - beta_start) + beta_start
 
         self.alphas = torch.cumprod(1 - self.betas, dim=0)
 
@@ -184,6 +211,8 @@ class ClassifierDDPM:
     def __init__(self, model: ConditionalDDPM, noise_scheduler: NoiseScheduler):
         self.model = model
         self.noise_scheduler = noise_scheduler
+        self.num_samples = 20000
+        self.k = 100
 
     def __call__(self, x):
         pass
@@ -195,25 +224,51 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted class tensor [batch_size]
         """
-        num_timesteps = len(self.noise_scheduler)
-        t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
-        noise = torch.randn_like(x)
-        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
-        optimizer.zero_grad()
-        xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-        t = t.float().reshape(-1, 1)
-        losses = []
+        # num_timesteps = len(self.noise_scheduler)
+        # # t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
+        # t = torch.ones(x.shape[0], device=device, dtype=torch.long) * (num_timesteps - 1)
+        # noise = torch.randn_like(x)
+        # alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        # xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
+        # t = t.float().reshape(-1, 1)
+        # losses = []
+        # for c in range(self.model.n_classes):
+        #     y = torch.ones(x.shape[0], device=device) * c
+        #     y = y.float().reshape(-1, 1)
+        #     noise_pred = model(xt, t, y)
+        #     loss = torch.sqrt(((noise_pred-noise)**2).sum(dim=1))
+        #     losses.append(loss)
+
+        # losses = torch.vstack(losses)
+
+        # return torch.argmin(losses, dim=0)
+
+        samples, ys = sampleConditional(self.model, self.num_samples, self.noise_scheduler)
+        # Convert samples and their labels to the device
+        samples = samples.to(device)
+        ys = ys.to(device)
+        
+        # Calculate pairwise distances between test points and all samples
+        # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
+        x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
+        samples_norm = torch.sum(samples ** 2, dim=1, keepdim=True)
+        dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
+        
+        # Get indices of k-nearest neighbors
+        _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
+        
+        # Get the labels of these neighbors
+        neighbor_labels = ys[indices]
+        
+        # Count occurrences of each class among neighbors
+        counts = torch.zeros(x.shape[0], self.model.n_classes, device=device)
         for c in range(self.model.n_classes):
-            y = torch.ones(x.shape[0], device=device) * c
-            y = y.float().reshape(-1, 1)
-            noise_pred = model(xt, t, y)
-            loss = F.mse_loss(noise_pred, noise)
-            losses.append(loss.item())
-
-        losses = torch.tensor(losses)
-
-        return torch.argmin(losses, dim=0)
-
+            counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
+        
+        # Return the class with the most votes
+        y_pred = torch.argmax(counts, dim=1)
+        return y_pred
+    
     def predict_proba(self, x):
         """
         Args:
@@ -221,24 +276,49 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted probabilites for each class  [batch_size, n_classes]
         """
-        num_timesteps = len(self.noise_scheduler)
-        t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
-        noise = torch.randn_like(x)
-        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
-        optimizer.zero_grad()
-        xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-        t = t.float().reshape(-1, 1)
-        losses = []
+        # num_timesteps = len(self.noise_scheduler)
+        # # t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
+        # t = torch.ones(x.shape[0], device=device, dtype=torch.long) * (num_timesteps - 1)
+        # noise = torch.randn_like(x)
+        # alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        # xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
+        # t = t.float().reshape(-1, 1)
+        # losses = []
+        # for c in range(self.model.n_classes):
+        #     y = torch.ones(x.shape[0], device=device) * c
+        #     y = y.float().reshape(-1, 1)
+        #     noise_pred = model(xt, t, y)
+        #     loss = torch.sqrt(((noise_pred-noise)**2).sum(dim=1))
+        #     losses.append(loss)
+
+        # losses = torch.vstack(losses)
+        
+        # return F.softmax(-losses, dim=1)
+
+        samples, ys = sampleConditional(self.model, self.num_samples, self.noise_scheduler)
+        # Convert samples and their labels to the device
+        samples = samples.to(device)
+        ys = ys.to(device)
+        
+        # Calculate pairwise distances between test points and all samples
+        # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
+        x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
+        samples_norm = torch.sum(samples ** 2, dim=1, keepdim=True)
+        dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
+        
+        # Get indices of k-nearest neighbors
+        _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
+        
+        # Get the labels of these neighbors
+        neighbor_labels = ys[indices]
+        
+        # Count occurrences of each class among neighbors
+        counts = torch.zeros(x.shape[0], self.model.n_classes, device=device)
         for c in range(self.model.n_classes):
-            y = torch.ones(x.shape[0], device=device) * c
-            y = y.float().reshape(-1, 1)
-            noise_pred = model(xt, t, y)
-            loss = F.mse_loss(noise_pred, noise)
-            losses.append(loss.item())
-
-        losses = torch.tensor(losses)
-
-        return F.softmax(-losses, dim=0)
+            counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
+        
+        # Return the probabilities
+        return counts / self.k
 
 
 def train(model, noise_scheduler, dataloader, optimizer, epochs, run_name):

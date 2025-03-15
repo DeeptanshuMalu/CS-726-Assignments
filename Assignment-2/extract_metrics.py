@@ -70,7 +70,7 @@ if __name__ == "__main__":
                 dim = 2
             runname = f"exps/ddpm_{dim}_{step}_{lbeta}_{ubeta}_{dataset}"
             metrics_content = f"{runname[5:]}:\n"
-            
+
             for guidance_scale in GUIDANCE_SCALES:
                 file_path = os.path.join(runname, f"metrics_cfg_{guidance_scale}.txt")
                 with open(file_path, "r") as metrics_f:
@@ -79,7 +79,7 @@ if __name__ == "__main__":
                     metrics_content += "\n\n"
 
             metrics_content += "\n"
-            
+
             f.write(metrics_content)
 
     with open("vary_schedule.txt", "w") as f:
@@ -98,3 +98,21 @@ if __name__ == "__main__":
                     metrics_content = metrics_f.read().strip()
                     f.write(f"{runname[5:]}:\n{metrics_content}\n")
                     f.write("\n")
+
+    with open("vary_svdd.txt", "w") as f:
+        step = 150
+        lbeta = 0.0001
+        ubeta = 0.02
+        for dataset in DATASETS:
+            if dataset == "helix":
+                dim = 3
+            else:
+                dim = 2
+            runname = f"exps/ddpm_{dim}_{step}_{lbeta}_{ubeta}_{dataset}"
+
+            file_path = os.path.join(runname, "metrics_svdd.txt")
+
+            with open(file_path, "r") as metrics_f:
+                metrics_content = metrics_f.read().strip()
+                f.write(f"{runname[5:]}:\n{metrics_content}\n")
+                f.write("\n")

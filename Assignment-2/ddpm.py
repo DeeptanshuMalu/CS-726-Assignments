@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 
+
 class NoiseScheduler:
     """
     Noise scheduler for the DDPM model
@@ -61,9 +62,11 @@ class NoiseScheduler:
         clip_min = 1e-9
         s = 1e-3
         t = torch.arange(self.num_timesteps, dtype=torch.float32)
-        output = torch.cos((t + s)/(self.num_timesteps + s) * np.pi / 2)
+        output = torch.cos((t + s) / (self.num_timesteps + s) * np.pi / 2)
         self.alphas = torch.clip(output, clip_min, 0.999)
-        alphas_padded = torch.cat([torch.ones(1, dtype=torch.float32), self.alphas[:-1]])
+        alphas_padded = torch.cat(
+            [torch.ones(1, dtype=torch.float32), self.alphas[:-1]]
+        )
         self.betas = 1 - (self.alphas / alphas_padded)
 
     def init_sigmoid_schedule(self, beta_start, beta_end):
@@ -76,12 +79,13 @@ class NoiseScheduler:
         t = torch.arange(self.num_timesteps, dtype=torch.float32)
         v_start = torch.sigmoid(torch.tensor(start))
         v_end = torch.sigmoid(torch.tensor(end))
-        output = torch.sigmoid((t/self.num_timesteps) * (end - start) + start)
+        output = torch.sigmoid((t / self.num_timesteps) * (end - start) + start)
         output = (v_end - output) / (v_end - v_start)
         self.alphas = torch.clip(output, clip_min, 0.999)
-        alphas_padded = torch.cat([torch.ones(1, dtype=torch.float32), self.alphas[:-1]])
+        alphas_padded = torch.cat(
+            [torch.ones(1, dtype=torch.float32), self.alphas[:-1]]
+        )
         self.betas = 1 - (self.alphas / alphas_padded)
-        
 
     def __len__(self):
         return self.num_timesteps
@@ -249,32 +253,34 @@ class ClassifierDDPM:
 
         # return torch.argmin(losses, dim=0)
 
-        samples, ys = sampleConditional(self.model, self.num_samples, self.noise_scheduler)
+        samples, ys = sampleConditional(
+            self.model, self.num_samples, self.noise_scheduler
+        )
         # Convert samples and their labels to the device
         samples = samples.to(device)
         ys = ys.to(device)
         n_classes = torch.unique(ys).shape[0]
         # Calculate pairwise distances between test points and all samples
         # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
-        x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
-        samples_norm = torch.sum(samples ** 2, dim=1, keepdim=True)
+        x_norm = torch.sum(x**2, dim=1, keepdim=True)
+        samples_norm = torch.sum(samples**2, dim=1, keepdim=True)
         dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
-        
+
         # Get indices of k-nearest neighbors
         _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
-        
+
         # Get the labels of these neighbors
         neighbor_labels = ys[indices]
-        
+
         # Count occurrences of each class among neighbors
         counts = torch.zeros(x.shape[0], n_classes, device=device)
         for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
-        
+
         # Return the class with the most votes
         y_pred = torch.argmax(counts, dim=1)
         return y_pred
-    
+
     def predict_proba(self, x):
         """
         Args:
@@ -298,31 +304,33 @@ class ClassifierDDPM:
         #     losses.append(loss)
 
         # losses = torch.vstack(losses)
-        
+
         # return F.softmax(-losses, dim=1)
 
-        samples, ys = sampleConditional(self.model, self.num_samples, self.noise_scheduler)
+        samples, ys = sampleConditional(
+            self.model, self.num_samples, self.noise_scheduler
+        )
         # Convert samples and their labels to the device
         samples = samples.to(device)
         ys = ys.to(device)
-        n_classes = torch.unique(ys).shape[0]        
+        n_classes = torch.unique(ys).shape[0]
         # Calculate pairwise distances between test points and all samples
         # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
-        x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
-        samples_norm = torch.sum(samples ** 2, dim=1, keepdim=True)
+        x_norm = torch.sum(x**2, dim=1, keepdim=True)
+        samples_norm = torch.sum(samples**2, dim=1, keepdim=True)
         dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
-        
+
         # Get indices of k-nearest neighbors
         _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
-        
+
         # Get the labels of these neighbors
         neighbor_labels = ys[indices]
-        
+
         # Count occurrences of each class among neighbors
         counts = torch.zeros(x.shape[0], n_classes, device=device)
         for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
-        
+
         # Return the probabilities
         return counts / self.k
 
@@ -461,7 +469,10 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
     else:
         return init_sample
 
-def trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, p_uncond=0.5):
+
+def trainConditional(
+    model, noise_scheduler, dataloader, optimizer, epochs, run_name, p_uncond=0.5
+):
     print(model)
     print(run_name)
 
@@ -498,6 +509,7 @@ def trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_
     plt.savefig(f"{run_name}/train_loss_conditional.png")
     torch.save(model.state_dict(), f"{run_name}/model_conditional.pth")
 
+
 @torch.no_grad()
 def sampleConditional(model, n_samples, noise_scheduler):
     n_dim = model.n_dim
@@ -506,7 +518,7 @@ def sampleConditional(model, n_samples, noise_scheduler):
     T = len(noise_scheduler)
     samples = []
     ys = []
-        
+
     for c in range(n_classes):
         y = torch.ones(n_samples_per_class).to(device) * c
         ys.append(y)
@@ -532,10 +544,7 @@ def sampleConditional(model, n_samples, noise_scheduler):
                 sigma_t = torch.sqrt(1 - alpha_t)
                 init_sample = init_sample + z * sigma_t
 
-
         samples.append(init_sample.clone())
-
-
 
     samples = torch.vstack(samples)
     ys = torch.cat(ys)
@@ -556,6 +565,7 @@ def sampleConditional(model, n_samples, noise_scheduler):
     plt.close()
 
     return samples, ys
+
 
 @torch.no_grad()
 def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
@@ -587,16 +597,13 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
         t_batch = t_batch.float().reshape(-1, 1)
         y = y.float().reshape(-1, 1)
         y_uncond = y_uncond.float().reshape(-1, 1)
-        guided_eps = (1+guidance_scale) * model(init_sample, t_batch, y) - guidance_scale * model(init_sample, t_batch, y_uncond)
+        guided_eps = (1 + guidance_scale) * model(
+            init_sample, t_batch, y
+        ) - guidance_scale * model(init_sample, t_batch, y_uncond)
         init_sample = (
             1
             / torch.sqrt(alpha_t)
-            * (
-                init_sample
-                - (1 - alpha_t)
-                / torch.sqrt(1 - alpha_bar_t)
-                * guided_eps
-            )
+            * (init_sample - (1 - alpha_t) / torch.sqrt(1 - alpha_bar_t) * guided_eps)
         )
         if t > 0:
             sigma_t = torch.sqrt(1 - alpha_t)
@@ -606,7 +613,9 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     emd_list = []
     data_X_class = data_X[data_y == class_label]
     for i in range(5):
-        subsample_data_X = utils.sample(data_X_class.to("cpu").numpy(), size=subsample_size)
+        subsample_data_X = utils.sample(
+            data_X_class.to("cpu").numpy(), size=subsample_size
+        )
         subsample_samples = utils.sample(
             init_sample.to("cpu").numpy(), size=subsample_size
         )
@@ -617,6 +626,7 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     print(f"EMD_{class_label}: {emd_avg}")
 
     return init_sample
+
 
 @torch.no_grad()
 def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
@@ -635,7 +645,7 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     """
     n_dim = args.n_dim
     M = 10
-    init_sample = torch.randn((n_samples//n_classes, n_dim)).to(device)
+    init_sample = torch.randn((n_samples, n_dim)).to(device)
     T = len(noise_scheduler)
     for t in range(T - 1, -1, -1):
         print(f"Sampling at t={t}")
@@ -645,7 +655,7 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
         M_samples = []
         x0s = []
         for _ in range(M):
-            t_batch = torch.ones(n_samples//n_classes).to(device) * t
+            t_batch = torch.ones(n_samples).to(device) * t
             z = torch.randn_like(init_sample, device=device)
             t_batch = t_batch.float().reshape(-1, 1)
             init_sample = (
@@ -662,18 +672,26 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
                 sigma_t = torch.sqrt(1 - alpha_t)
                 init_sample = init_sample + z * sigma_t
             M_samples.append(init_sample)
-            x0 = 1 / torch.sqrt(alpha_t) * (init_sample - (1 - alpha_t) / torch.sqrt(1 - alpha_bar_t) * model(init_sample, t_batch))
+            x0 = (
+                1
+                / torch.sqrt(alpha_t)
+                * (
+                    init_sample
+                    - (1 - alpha_t)
+                    / torch.sqrt(1 - alpha_bar_t)
+                    * model(init_sample, t_batch)
+                )
+            )
             x0s.append(x0)
-
 
         rewards = [reward_fn(x0) for x0 in x0s]
         rewards = torch.vstack(rewards)
 
         probs = torch.softmax(rewards / reward_scale, dim=0)
         indices = torch.multinomial(probs.t(), num_samples=1).squeeze(-1)
-        
+
         x_candidates = torch.stack(M_samples, dim=1)
-        init_sample = x_candidates[torch.arange(n_samples//n_classes), indices]
+        init_sample = x_candidates[torch.arange(n_samples), indices]
 
     return init_sample
 
@@ -681,7 +699,19 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg", "classify", "sample_svdd"], default="sample")
+    parser.add_argument(
+        "--mode",
+        choices=[
+            "train",
+            "sample",
+            "train_conditional",
+            "sample_conditional",
+            "sample_cfg",
+            "classify",
+            "sample_svdd",
+        ],
+        default="sample",
+    )
     parser.add_argument("--n_steps", type=int, default=None)
     parser.add_argument("--lbeta", type=float, default=None)
     parser.add_argument("--ubeta", type=float, default=None)
@@ -702,7 +732,9 @@ if __name__ == "__main__":
     if args.scheduler == "linear":
         run_name = f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.lbeta}_{args.ubeta}_{args.dataset}"  # can include more hyperparams
     elif args.scheduler == "cosine" or args.scheduler == "sigmoid":
-        run_name = f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.scheduler}_{args.dataset}"
+        run_name = (
+            f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.scheduler}_{args.dataset}"
+        )
     os.makedirs(run_name, exist_ok=True)
 
     model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps)
@@ -746,7 +778,9 @@ if __name__ == "__main__":
         data_X = data_X.to(device)
         data_y = data_y.to(device)
         n_classes = len(torch.unique(data_y))
-        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model = ConditionalDDPM(
+            n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes
+        ).to(device)
         epochs = args.epochs
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         dataloader = torch.utils.data.DataLoader(
@@ -754,41 +788,64 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             shuffle=True,
         )
-        trainConditional(model, noise_scheduler, dataloader, optimizer, epochs, run_name, p_uncond=args.p_uncond)\
-        
+        trainConditional(
+            model,
+            noise_scheduler,
+            dataloader,
+            optimizer,
+            epochs,
+            run_name,
+            p_uncond=args.p_uncond,
+        )
     elif args.mode == "sample_conditional":
         data_X, data_y = dataset.load_dataset(args.dataset)
         data_X = data_X.to(device)
         data_y = data_y.to(device)
         n_classes = len(torch.unique(data_y))
-        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model = ConditionalDDPM(
+            n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes
+        ).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
         samples, ys = sampleConditional(model, args.n_samples, noise_scheduler)
-        torch.save(samples, f"{run_name}/samples_conditional_{args.seed}_{args.n_samples}.pth")
-        torch.save(ys, f"{run_name}/labels_conditional_{args.seed}_{args.n_samples}.pth")
+        torch.save(
+            samples, f"{run_name}/samples_conditional_{args.seed}_{args.n_samples}.pth"
+        )
+        torch.save(
+            ys, f"{run_name}/labels_conditional_{args.seed}_{args.n_samples}.pth"
+        )
 
     elif args.mode == "sample_cfg":
         data_X, data_y = dataset.load_dataset(args.dataset)
         data_X = data_X.to(device)
         data_y = data_y.to(device)
         n_classes = len(torch.unique(data_y))
-        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model = ConditionalDDPM(
+            n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes
+        ).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
         samples = []
         # emds = []
         ys = []
         for c in range(n_classes):
-            init_sample = sampleCFG(model, args.n_samples, noise_scheduler, args.guidance_scale, c)
+            init_sample = sampleCFG(
+                model, args.n_samples, noise_scheduler, args.guidance_scale, c
+            )
             samples.append(init_sample)
             # emds.append(emd)
-            ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
+            ys.append(torch.ones(args.n_samples // n_classes).to(device) * c)
 
         samples = torch.vstack(samples)
         # emd_avg = sum(emds) / len(emds)
         ys = torch.cat(ys)
 
-        torch.save(samples, f"{run_name}/samples_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth")
-        torch.save(ys, f"{run_name}/labels_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth")
+        torch.save(
+            samples,
+            f"{run_name}/samples_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth",
+        )
+        torch.save(
+            ys,
+            f"{run_name}/labels_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth",
+        )
 
         T = len(noise_scheduler)
         if samples.shape[1] == 2:
@@ -822,7 +879,9 @@ if __name__ == "__main__":
         data_y = data_y.to(device)
         n_classes = len(torch.unique(data_y))
 
-        model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
+        model = ConditionalDDPM(
+            n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes
+        ).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
         clf_ddpm = ClassifierDDPM(model, noise_scheduler)
         y_pred = clf_ddpm.predict(data_X)
@@ -855,13 +914,23 @@ if __name__ == "__main__":
             def reward_fn(samples):
                 probs = clf.predict_proba(samples.cpu().numpy())
                 return torch.tensor(probs[:, c]).to(device)
-            
-            init_sample = sampleSVDD(model, args.n_samples, noise_scheduler, reward_scale, reward_fn)
+
+            init_sample = sampleSVDD(
+                model,
+                args.n_samples // n_classes,
+                noise_scheduler,
+                reward_scale,
+                reward_fn,
+            )
             subsample_size = 250
             emds_class = []
             for i in range(5):
-                subsample_data_X = utils.sample(data_X[data_y == c].to("cpu").numpy(), size=subsample_size)
-                subsample_samples = utils.sample(init_sample.to("cpu").numpy(), size=subsample_size)
+                subsample_data_X = utils.sample(
+                    data_X[data_y == c].to("cpu").numpy(), size=subsample_size
+                )
+                subsample_samples = utils.sample(
+                    init_sample.to("cpu").numpy(), size=subsample_size
+                )
                 emd = utils.get_emd(subsample_data_X, subsample_samples)
                 print(f"{i} EMD_{c}: {emd}")
                 emds_class.append(emd)
@@ -870,7 +939,7 @@ if __name__ == "__main__":
             emds.append(emd_avg)
 
             samples.append(init_sample)
-            ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
+            ys.append(torch.ones(args.n_samples // n_classes).to(device) * c)
 
         samples = torch.vstack(samples)
         ys = torch.cat(ys)
@@ -902,7 +971,7 @@ if __name__ == "__main__":
             ax.scatter(x1, x2, x3, s=1, c=ys.cpu().numpy())
         plt.title(f"Samples at t={T}")
         plt.savefig(f"{run_name}/samples_svdd_{T}.png")
-        plt.close()   
+        plt.close()
 
     else:
         raise ValueError(f"Invalid mode {args.mode}")

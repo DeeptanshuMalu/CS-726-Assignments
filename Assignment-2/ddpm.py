@@ -616,14 +616,14 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     emd_avg = sum(emd_list) / len(emd_list)
     print(f"EMD_{class_label}: {emd_avg}")
 
-    return init_sample, emd_avg
+    return init_sample
 
 def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     """
     Sample from the SVDD model
 
     Args:
-        model: ConditionalDDPM
+        model: DDPM
         n_samples: int
         noise_scheduler: NoiseScheduler
         reward_scale: float
@@ -632,13 +632,48 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     Returns:
         torch.Tensor, samples from the model [n_samples, n_dim]
     """
-    pass
+    n_dim = args.n_dim
+    M = 10
+    init_sample = torch.randn((n_samples//n_classes, n_dim)).to(device)
+    T = len(noise_scheduler)
+    for t in range(T - 1, -1, -1):
+        t_batch = torch.ones(n_samples//n_classes).to(device) * t
+        alpha_t = 1 - noise_scheduler.betas.to(device)[t].view(-1, 1)
+        alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
+        M_samples = []
+        for _ in range(M):
+            z = torch.randn_like(init_sample, device=device)
+            t_batch = t_batch.float().reshape(-1, 1)
+            init_sample = (
+                1
+                / torch.sqrt(alpha_t)
+                * (
+                    init_sample
+                    - (1 - alpha_t)
+                    / torch.sqrt(1 - alpha_bar_t)
+                    * model(init_sample, t_batch)
+                )
+            )
+            if t > 0:
+                sigma_t = torch.sqrt(1 - alpha_t)
+                init_sample = init_sample + z * sigma_t
+            M_samples.append(init_sample)
+
+        rewards = [reward_fn(samples) for samples in M_samples]
+        rewards = torch.vstack(rewards)
+
+        probs = torch.softmax(rewards / reward_scale, dim=0)
+        indices = torch.multinomial(probs, num_samples=1).squeeze()
+        x_candidates = torch.stack(M_samples, dim=1)
+        init_sample = x_candidates[torch.arange(n_samples//n_classes), indices]
+
+    return init_sample
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg", "classify"], default="sample")
+    parser.add_argument("--mode", choices=["train", "sample", "train_conditional", "sample_conditional", "sample_cfg", "classify", "sample_svdd"], default="sample")
     parser.add_argument("--n_steps", type=int, default=None)
     parser.add_argument("--lbeta", type=float, default=None)
     parser.add_argument("--ubeta", type=float, default=None)
@@ -732,16 +767,16 @@ if __name__ == "__main__":
         model = ConditionalDDPM(n_dim=args.n_dim, n_steps=args.n_steps, n_classes=n_classes).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
         samples = []
-        emds = []
+        # emds = []
         ys = []
         for c in range(n_classes):
-            init_sample, emd = sampleCFG(model, args.n_samples, noise_scheduler, args.guidance_scale, c)
+            init_sample = sampleCFG(model, args.n_samples, noise_scheduler, args.guidance_scale, c)
             samples.append(init_sample)
-            emds.append(emd)
+            # emds.append(emd)
             ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
 
         samples = torch.vstack(samples)
-        emd_avg = sum(emds) / len(emds)
+        # emd_avg = sum(emds) / len(emds)
         ys = torch.cat(ys)
 
         torch.save(samples, f"{run_name}/samples_cfg_{args.seed}_{args.n_samples}_{args.guidance_scale}.pth")
@@ -770,7 +805,7 @@ if __name__ == "__main__":
         acc = np.mean(ys_pred == ys.cpu().numpy())
         print(f"Accuracy: {acc}")
         with open(f"{run_name}/metrics_cfg_{args.guidance_scale}.txt", "w") as f:
-            f.write(f"EMD: {emd_avg}\n")
+            # f.write(f"EMD: {emd_avg}\n")
             f.write(f"Accuracy: {acc}\n")
 
     elif args.mode == "classify":
@@ -790,6 +825,50 @@ if __name__ == "__main__":
         clf = joblib.load(model_filename)
         acc_classical = clf.score(data_X.cpu().numpy(), data_y.cpu().numpy())
         print(f"Accuracy of classical classifier: {acc_classical}")
+
+    elif args.mode == "sample_svdd":
+        data_X, data_y = dataset.load_dataset(args.dataset)
+        data_X = data_X.to(device)
+        data_y = data_y.to(device)
+        n_classes = len(torch.unique(data_y))
+
+        model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps).to(device)
+        model.load_state_dict(torch.load(f"{run_name}/model.pth"))
+        reward_scale = 1.0
+
+        model_filename = f"classifier_models/{args.dataset}_mlp_model.pkl"
+        clf = joblib.load(model_filename)
+        samples = []
+        ys = []
+        for c in range(n_classes):
+            def reward_fn(samples):
+                probs = clf.predict_proba(samples.cpu().numpy())
+                return torch.tensor(probs[:, c]).to(device)
+            
+            init_sample = sampleSVDD(model, args.n_samples, noise_scheduler, reward_scale, reward_fn)
+            samples.append(init_sample)
+            ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
+
+        samples = torch.vstack(samples)
+        ys = torch.cat(ys)
+        torch.save(samples, f"{run_name}/samples_svdd_{args.seed}_{args.n_samples}.pth")
+        torch.save(ys, f"{run_name}/labels_svdd_{args.seed}_{args.n_samples}.pth")
+
+        T = len(noise_scheduler)
+        if samples.shape[1] == 2:
+            x1 = samples[:, 0].cpu().numpy()
+            x2 = samples[:, 1].cpu().numpy()
+            plt.scatter(x1, x2, s=1, c=ys.cpu().numpy())
+        elif samples.shape[1] == 3:
+            x1 = samples[:, 0].cpu().numpy()
+            x2 = samples[:, 1].cpu().numpy()
+            x3 = samples[:, 2].cpu().numpy()
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            ax.scatter(x1, x2, x3, s=1, c=ys.cpu().numpy())
+        plt.title(f"Samples at t={T}")
+        plt.savefig(f"{run_name}/samples_svdd_{T}.png")
+        plt.close()   
 
     else:
         raise ValueError(f"Invalid mode {args.mode}")

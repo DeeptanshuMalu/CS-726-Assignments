@@ -253,7 +253,7 @@ class ClassifierDDPM:
         # Convert samples and their labels to the device
         samples = samples.to(device)
         ys = ys.to(device)
-        
+        n_classes = torch.unique(ys).shape[0]
         # Calculate pairwise distances between test points and all samples
         # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
         x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
@@ -267,8 +267,8 @@ class ClassifierDDPM:
         neighbor_labels = ys[indices]
         
         # Count occurrences of each class among neighbors
-        counts = torch.zeros(x.shape[0], self.model.n_classes, device=device)
-        for c in range(self.model.n_classes):
+        counts = torch.zeros(x.shape[0], n_classes, device=device)
+        for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
         
         # Return the class with the most votes
@@ -305,7 +305,7 @@ class ClassifierDDPM:
         # Convert samples and their labels to the device
         samples = samples.to(device)
         ys = ys.to(device)
-        
+        n_classes = torch.unique(ys).shape[0]        
         # Calculate pairwise distances between test points and all samples
         # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
         x_norm = torch.sum(x ** 2, dim=1, keepdim=True)
@@ -319,8 +319,8 @@ class ClassifierDDPM:
         neighbor_labels = ys[indices]
         
         # Count occurrences of each class among neighbors
-        counts = torch.zeros(x.shape[0], self.model.n_classes, device=device)
-        for c in range(self.model.n_classes):
+        counts = torch.zeros(x.shape[0], n_classes, device=device)
+        for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
         
         # Return the probabilities

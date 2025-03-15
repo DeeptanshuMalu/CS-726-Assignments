@@ -81,3 +81,20 @@ if __name__ == "__main__":
             metrics_content += "\n"
             
             f.write(metrics_content)
+
+    with open("vary_schedule.txt", "w") as f:
+        step = 200
+        for dataset in DATASETS:
+            for schedule in ["cosine", "sigmoid"]:
+                if dataset == "helix":
+                    dim = 3
+                else:
+                    dim = 2
+                runname = f"exps/ddpm_{dim}_{step}_{schedule}_{dataset}"
+
+                file_path = os.path.join(runname, "metrics.txt")
+
+                with open(file_path, "r") as metrics_f:
+                    metrics_content = metrics_f.read().strip()
+                    f.write(f"{runname[5:]}:\n{metrics_content}\n")
+                    f.write("\n")

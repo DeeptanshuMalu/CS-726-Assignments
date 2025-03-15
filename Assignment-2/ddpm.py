@@ -618,6 +618,7 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
 
     return init_sample
 
+@torch.no_grad()
 def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     """
     Sample from the SVDD model
@@ -637,11 +638,14 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     init_sample = torch.randn((n_samples//n_classes, n_dim)).to(device)
     T = len(noise_scheduler)
     for t in range(T - 1, -1, -1):
-        t_batch = torch.ones(n_samples//n_classes).to(device) * t
+        print(f"Sampling at t={t}")
+
         alpha_t = 1 - noise_scheduler.betas.to(device)[t].view(-1, 1)
         alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
         M_samples = []
+        x0s = []
         for _ in range(M):
+            t_batch = torch.ones(n_samples//n_classes).to(device) * t
             z = torch.randn_like(init_sample, device=device)
             t_batch = t_batch.float().reshape(-1, 1)
             init_sample = (
@@ -658,12 +662,16 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
                 sigma_t = torch.sqrt(1 - alpha_t)
                 init_sample = init_sample + z * sigma_t
             M_samples.append(init_sample)
+            x0 = 1 / torch.sqrt(alpha_t) * (init_sample - (1 - alpha_t) / torch.sqrt(1 - alpha_bar_t) * model(init_sample, t_batch))
+            x0s.append(x0)
 
-        rewards = [reward_fn(samples) for samples in M_samples]
+
+        rewards = [reward_fn(x0) for x0 in x0s]
         rewards = torch.vstack(rewards)
 
         probs = torch.softmax(rewards / reward_scale, dim=0)
-        indices = torch.multinomial(probs, num_samples=1).squeeze()
+        indices = torch.multinomial(probs.t(), num_samples=1).squeeze(-1)
+        
         x_candidates = torch.stack(M_samples, dim=1)
         init_sample = x_candidates[torch.arange(n_samples//n_classes), indices]
 
@@ -834,23 +842,49 @@ if __name__ == "__main__":
 
         model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model.pth"))
-        reward_scale = 1.0
+        reward_scale = 1e-1
 
         model_filename = f"classifier_models/{args.dataset}_mlp_model.pkl"
         clf = joblib.load(model_filename)
         samples = []
         ys = []
+        emds = []
         for c in range(n_classes):
+            print(f"Sampling for class {c}")
+
             def reward_fn(samples):
                 probs = clf.predict_proba(samples.cpu().numpy())
                 return torch.tensor(probs[:, c]).to(device)
             
             init_sample = sampleSVDD(model, args.n_samples, noise_scheduler, reward_scale, reward_fn)
+            subsample_size = 250
+            emds_class = []
+            for i in range(5):
+                subsample_data_X = utils.sample(data_X[data_y == c].to("cpu").numpy(), size=subsample_size)
+                subsample_samples = utils.sample(init_sample.to("cpu").numpy(), size=subsample_size)
+                emd = utils.get_emd(subsample_data_X, subsample_samples)
+                print(f"{i} EMD_{c}: {emd}")
+                emds_class.append(emd)
+            emd_avg = sum(emds_class) / len(emds_class)
+            print(f"EMD_{c}: {emd_avg}")
+            emds.append(emd_avg)
+
             samples.append(init_sample)
             ys.append(torch.ones(args.n_samples//n_classes).to(device) * c)
 
         samples = torch.vstack(samples)
         ys = torch.cat(ys)
+        emds_avg = sum(emds) / len(emds)
+        print(f"EMD: {emds_avg}")
+
+        ys_pred = clf.predict(samples.cpu().numpy())
+        acc = np.mean(ys_pred == ys.cpu().numpy())
+        print(f"Accuracy: {acc}")
+
+        with open(f"{run_name}/metrics_svdd.txt", "w") as f:
+            f.write(f"EMD: {emds_avg}\n")
+            f.write(f"Accuracy: {acc}\n")
+
         torch.save(samples, f"{run_name}/samples_svdd_{args.seed}_{args.n_samples}.pth")
         torch.save(ys, f"{run_name}/labels_svdd_{args.seed}_{args.n_samples}.pth")
 

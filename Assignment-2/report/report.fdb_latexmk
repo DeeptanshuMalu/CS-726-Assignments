@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1742024423.76931 "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-2/report/report.tex" "report.pdf" "report" 1742024432.27292 0
+["pdflatex"] 1742060498.07862 "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-2/report/report.tex" "report.pdf" "report" 1742060505.23098 0
   "../exps/ddpm_2_100_0.0001_0.02_blobs/samples_100.png" 1741796614 36830 098c64c2314938f14a74e70283b404a6 ""
   "../exps/ddpm_2_100_0.0001_0.02_circles/samples_100.png" 1741796614 51300 2fc10a1b329775242f47498010a35ab0 ""
   "../exps/ddpm_2_100_0.0001_0.02_manycircles/samples_100.png" 1741796614 52212 36bcf1da63d5fee27d0d811aab4dddab ""
@@ -130,7 +130,9 @@
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/tfm/public/cm/cmtt10.tfm" 1136765053 768 1321e9409b4137d6fb428ac9dc956269 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx10.pfb" 1247596666 34811 78b52f49e893bcba91bd7581cdc144c0 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx12.pfb" 1247596666 32080 340ef9bf63678554ee606688e7b5339d ""
+  "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmex10.pfb" 1247596667 30251 6afa5cb1d0204815a708a080681d4674 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb" 1247596667 36299 5f9df58c2139e7edcf37c8fca4bd384d ""
+  "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi8.pfb" 1247596666 35469 dcf3a5f2fc1862f5952e3ee5eb1d98c4 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1247596667 35752 024fb6c41858982481f6968b5fc26508 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr12.pfb" 1247596667 32722 d7379af29a190c3f453aba36302ff5a9 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr17.pfb" 1247596666 32362 bc3f3eec7ab7d65fe700963d4017d32c ""
@@ -197,10 +199,10 @@
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/rerunfilecheck/rerunfilecheck.sty" 1657800696 9714 ba3194bd52c8499b3f1e3eb91d409670 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/tools/longtable.sty" 1700599895 12935 94a3291359b5f73ff1b19345a6983105 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
-  "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-2/report/report.tex" 1742024416 29593 569321fcade85574b7cb449df55bd0cb ""
-  "report.aux" 1742024431 10016 43ce40722362f8eb59e40b077eb3f5e2 "pdflatex"
-  "report.out" 1742024431 2794 485e0d4dc5353e84589cf7ccf3e4f2c2 "pdflatex"
-  "report.tex" 1742024416 29593 569321fcade85574b7cb449df55bd0cb ""
+  "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-2/report/report.tex" 1742060492 31554 2654e573bd59113c9eba85540dc3b7cc ""
+  "report.aux" 1742060504 10918 c5ecec1481fdbb43a5d12b1bdf3fd9e5 "pdflatex"
+  "report.out" 1742060504 2983 68df394beb062760d152e56216167a75 "pdflatex"
+  "report.tex" 1742060492 31554 2654e573bd59113c9eba85540dc3b7cc ""
   (generated)
   "report.aux"
   "report.log"

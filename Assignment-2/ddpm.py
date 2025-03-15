@@ -234,50 +234,26 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted class tensor [batch_size]
         """
-        # num_timesteps = len(self.noise_scheduler)
-        # # t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
-        # t = torch.ones(x.shape[0], device=device, dtype=torch.long) * (num_timesteps - 1)
-        # noise = torch.randn_like(x)
-        # alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
-        # xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-        # t = t.float().reshape(-1, 1)
-        # losses = []
-        # for c in range(self.model.n_classes):
-        #     y = torch.ones(x.shape[0], device=device) * c
-        #     y = y.float().reshape(-1, 1)
-        #     noise_pred = model(xt, t, y)
-        #     loss = torch.sqrt(((noise_pred-noise)**2).sum(dim=1))
-        #     losses.append(loss)
-
-        # losses = torch.vstack(losses)
-
-        # return torch.argmin(losses, dim=0)
-
         samples, ys = sampleConditional(
             self.model, self.num_samples, self.noise_scheduler
         )
-        # Convert samples and their labels to the device
+
         samples = samples.to(device)
         ys = ys.to(device)
         n_classes = torch.unique(ys).shape[0]
-        # Calculate pairwise distances between test points and all samples
-        # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
+
         x_norm = torch.sum(x**2, dim=1, keepdim=True)
         samples_norm = torch.sum(samples**2, dim=1, keepdim=True)
         dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
 
-        # Get indices of k-nearest neighbors
         _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
 
-        # Get the labels of these neighbors
         neighbor_labels = ys[indices]
 
-        # Count occurrences of each class among neighbors
         counts = torch.zeros(x.shape[0], n_classes, device=device)
         for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
 
-        # Return the class with the most votes
         y_pred = torch.argmax(counts, dim=1)
         return y_pred
 
@@ -288,50 +264,26 @@ class ClassifierDDPM:
         Returns:
             torch.Tensor, the predicted probabilites for each class  [batch_size, n_classes]
         """
-        # num_timesteps = len(self.noise_scheduler)
-        # # t = torch.randint(0, num_timesteps, (x.shape[0],), device=device)
-        # t = torch.ones(x.shape[0], device=device, dtype=torch.long) * (num_timesteps - 1)
-        # noise = torch.randn_like(x)
-        # alpha_bar_t = noise_scheduler.alphas.to(device)[t].view(-1, 1)
-        # xt = torch.sqrt(alpha_bar_t) * x + torch.sqrt(1 - alpha_bar_t) * noise
-        # t = t.float().reshape(-1, 1)
-        # losses = []
-        # for c in range(self.model.n_classes):
-        #     y = torch.ones(x.shape[0], device=device) * c
-        #     y = y.float().reshape(-1, 1)
-        #     noise_pred = model(xt, t, y)
-        #     loss = torch.sqrt(((noise_pred-noise)**2).sum(dim=1))
-        #     losses.append(loss)
-
-        # losses = torch.vstack(losses)
-
-        # return F.softmax(-losses, dim=1)
-
         samples, ys = sampleConditional(
             self.model, self.num_samples, self.noise_scheduler
         )
-        # Convert samples and their labels to the device
+
         samples = samples.to(device)
         ys = ys.to(device)
         n_classes = torch.unique(ys).shape[0]
-        # Calculate pairwise distances between test points and all samples
-        # Using Euclidean distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a·b
+
         x_norm = torch.sum(x**2, dim=1, keepdim=True)
         samples_norm = torch.sum(samples**2, dim=1, keepdim=True)
         dist = x_norm + samples_norm.t() - 2 * torch.mm(x, samples.t())
 
-        # Get indices of k-nearest neighbors
         _, indices = torch.topk(dist, k=self.k, dim=1, largest=False)
 
-        # Get the labels of these neighbors
         neighbor_labels = ys[indices]
 
-        # Count occurrences of each class among neighbors
         counts = torch.zeros(x.shape[0], n_classes, device=device)
         for c in range(n_classes):
             counts[:, c] = torch.sum(neighbor_labels == c, dim=1)
 
-        # Return the probabilities
         return counts / self.k
 
 
@@ -401,7 +353,7 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         Optionally implement return_intermediate=True, will aid in visualizing the intermediate steps
     """
 
-    n_dim = model.n_dim
+    n_dim = args.n_dim
     init_sample = torch.randn((n_samples, n_dim)).to(device)
     T = len(noise_scheduler)
     all_samples = []
@@ -512,7 +464,7 @@ def trainConditional(
 
 @torch.no_grad()
 def sampleConditional(model, n_samples, noise_scheduler):
-    n_dim = model.n_dim
+    n_dim = args.n_dim
     n_classes = model.n_classes
     n_samples_per_class = n_samples // n_classes
     T = len(noise_scheduler)
@@ -582,7 +534,7 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     Returns:
         torch.Tensor, samples from the model [n_samples, n_dim]
     """
-    n_dim = model.n_dim
+    n_dim = args.n_dim
     n_classes = model.n_classes
     n_samples_per_class = n_samples // n_classes
     T = len(noise_scheduler)
@@ -608,22 +560,6 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
         if t > 0:
             sigma_t = torch.sqrt(1 - alpha_t)
             init_sample = init_sample + z * sigma_t
-
-    subsample_size = 250
-    emd_list = []
-    data_X_class = data_X[data_y == class_label]
-    for i in range(5):
-        subsample_data_X = utils.sample(
-            data_X_class.to("cpu").numpy(), size=subsample_size
-        )
-        subsample_samples = utils.sample(
-            init_sample.to("cpu").numpy(), size=subsample_size
-        )
-        emd = utils.get_emd(subsample_data_X, subsample_samples)
-        print(f"{i} EMD_{class_label}: {emd}")
-        emd_list.append(emd)
-    emd_avg = sum(emd_list) / len(emd_list)
-    print(f"EMD_{class_label}: {emd_avg}")
 
     return init_sample
 
@@ -824,18 +760,34 @@ if __name__ == "__main__":
         ).to(device)
         model.load_state_dict(torch.load(f"{run_name}/model_conditional.pth"))
         samples = []
-        # emds = []
+        emds = []
         ys = []
         for c in range(n_classes):
+            print(f"Sampling for class {c}")
             init_sample = sampleCFG(
                 model, args.n_samples, noise_scheduler, args.guidance_scale, c
             )
             samples.append(init_sample)
-            # emds.append(emd)
+            emds_class = []
+            subsample_size = 250
+            for i in range(5):
+                subsample_data_X = utils.sample(
+                    data_X[data_y == c].to("cpu").numpy(), size=subsample_size
+                )
+                subsample_samples = utils.sample(
+                    init_sample.to("cpu").numpy(), size=subsample_size
+                )
+                emd = utils.get_emd(subsample_data_X, subsample_samples)
+                print(f"{i} EMD_{c}: {emd}")
+                emds_class.append(emd)
+            emd_avg = sum(emds_class) / len(emds_class)
+            print(f"EMD_{c}: {emd_avg}")
+            emds.append(emd_avg)
             ys.append(torch.ones(args.n_samples // n_classes).to(device) * c)
 
         samples = torch.vstack(samples)
-        # emd_avg = sum(emds) / len(emds)
+        emds_avg = sum(emds) / len(emds)
+        print(f"EMD: {emds_avg}")
         ys = torch.cat(ys)
 
         torch.save(
@@ -870,7 +822,7 @@ if __name__ == "__main__":
         acc = np.mean(ys_pred == ys.cpu().numpy())
         print(f"Accuracy: {acc}")
         with open(f"{run_name}/metrics_cfg_{args.guidance_scale}.txt", "w") as f:
-            # f.write(f"EMD: {emd_avg}\n")
+            f.write(f"EMD: {emds_avg}\n")
             f.write(f"Accuracy: {acc}\n")
 
     elif args.mode == "classify":

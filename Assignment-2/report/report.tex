@@ -444,6 +444,8 @@ The model architecture for Classifier-Free Guidance (CFG) is similar to DDPM, wi
 \end{longtable}
 \label{tab:cfg_results}
 
+Earth Mover's Distance (EMD) is used because it measures the minimum cost to transform one distribution into another, accounting for geometric relationships between points. EMD evaluates the entire distribution, effectively capturing how well generated samples match the true data.
+
 We observe a clear trade-off between sample quality (measured by EMD) and conditional accuracy across all datasets. As the guidance scale increases, the accuracy generally improves. However, this comes at the cost of increasing EMD values, suggesting that the generated samples may stray further from the true data distribution.
 
 \begin{figure}[H]

@@ -58,24 +58,30 @@ class NoiseScheduler:
         """
         Precompute whatever quantities are required for training and sampling
         """
-        vals = 1 - torch.cos(
-            torch.linspace(0, np.pi / 2, self.num_timesteps)
-        ) ** 2
-
-        self.betas = beta_start + (beta_end - beta_start) * vals
-
-        self.alphas = torch.cumprod(1 - self.betas, dim=0)
+        clip_min = 1e-9
+        s = 1e-3
+        t = torch.arange(self.num_timesteps, dtype=torch.float32)
+        output = torch.cos((t + s)/(self.num_timesteps + s) * np.pi / 2)
+        self.alphas = torch.clip(output, clip_min, 0.999)
+        alphas_padded = torch.cat([torch.ones(1, dtype=torch.float32), self.alphas[:-1]])
+        self.betas = 1 - (self.alphas / alphas_padded)
 
     def init_sigmoid_schedule(self, beta_start, beta_end):
         """
         Precompute whatever quantities are required for training and sampling
         """
-
-        self.betas = 1 / (1 + torch.exp(
-            -torch.linspace(-3, 3, self.num_timesteps)
-        )) * (beta_end - beta_start) + beta_start
-
-        self.alphas = torch.cumprod(1 - self.betas, dim=0)
+        clip_min = 1e-9
+        start = -3
+        end = 3
+        t = torch.arange(self.num_timesteps, dtype=torch.float32)
+        v_start = torch.sigmoid(torch.tensor(start))
+        v_end = torch.sigmoid(torch.tensor(end))
+        output = torch.sigmoid((t/self.num_timesteps) * (end - start) + start)
+        output = (v_end - output) / (v_end - v_start)
+        self.alphas = torch.clip(output, clip_min, 0.999)
+        alphas_padded = torch.cat([torch.ones(1, dtype=torch.float32), self.alphas[:-1]])
+        self.betas = 1 - (self.alphas / alphas_padded)
+        
 
     def __len__(self):
         return self.num_timesteps
@@ -650,7 +656,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     utils.seed_everything(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    run_name = f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.lbeta}_{args.ubeta}_{args.dataset}"  # can include more hyperparams
+    if args.scheduler == "linear":
+        run_name = f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.lbeta}_{args.ubeta}_{args.dataset}"  # can include more hyperparams
+    elif args.scheduler == "cosine" or args.scheduler == "sigmoid":
+        run_name = f"exps/ddpm_{args.n_dim}_{args.n_steps}_{args.scheduler}_{args.dataset}"
     os.makedirs(run_name, exist_ok=True)
 
     model = DDPM(n_dim=args.n_dim, n_steps=args.n_steps)

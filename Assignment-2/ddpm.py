@@ -353,7 +353,7 @@ def sample(model, n_samples, noise_scheduler, return_intermediate=False):
         Optionally implement return_intermediate=True, will aid in visualizing the intermediate steps
     """
 
-    n_dim = args.n_dim
+    n_dim = model.n_dim
     init_sample = torch.randn((n_samples, n_dim)).to(device)
     T = len(noise_scheduler)
     all_samples = []
@@ -464,7 +464,7 @@ def trainConditional(
 
 @torch.no_grad()
 def sampleConditional(model, n_samples, noise_scheduler):
-    n_dim = args.n_dim
+    n_dim = model.n_dim
     n_classes = model.n_classes
     n_samples_per_class = n_samples // n_classes
     T = len(noise_scheduler)
@@ -534,7 +534,7 @@ def sampleCFG(model, n_samples, noise_scheduler, guidance_scale, class_label):
     Returns:
         torch.Tensor, samples from the model [n_samples, n_dim]
     """
-    n_dim = args.n_dim
+    n_dim = model.n_dim
     n_classes = model.n_classes
     n_samples_per_class = n_samples // n_classes
     T = len(noise_scheduler)
@@ -579,7 +579,7 @@ def sampleSVDD(model, n_samples, noise_scheduler, reward_scale, reward_fn):
     Returns:
         torch.Tensor, samples from the model [n_samples, n_dim]
     """
-    n_dim = args.n_dim
+    n_dim = model.n_dim
     M = 10
     init_sample = torch.randn((n_samples, n_dim)).to(device)
     T = len(noise_scheduler)

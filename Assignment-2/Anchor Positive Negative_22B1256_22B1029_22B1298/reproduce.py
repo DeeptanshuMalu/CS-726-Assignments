@@ -47,7 +47,7 @@ if __name__ == "__main__":
     n_samples = priors.shape[0]
 
     model = DDPM(n_dim=n_dim, n_steps=n_steps).to(device)
-    model.load_state_dict(torch.load(f'albatross_model.pth'))
+    model.load_state_dict(torch.load(f'albatross_model.pth', map_location=device))
 
     noise_scheduler = NoiseScheduler(num_timesteps=n_steps, beta_start=lbeta, beta_end=ubeta)
 

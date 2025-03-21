@@ -5,7 +5,7 @@
 2. Getting access to IN22 dataset: Sign in to your huggingface account and accept the agreement here: https://huggingface.co/datasets/ai4bharat/IN22-Gen
 3. Install dependencies: The codebase has a `environment.yml` file, which you can use to create a new envrinoment as follows:
 ```bash 
-conda create --name cs726_a3 --file environment.yml
+conda env create -f environment.yml
 ```
 4. Install Medusa: Next, you need Medusa's codebase which can be installed as follows:
 ```bash

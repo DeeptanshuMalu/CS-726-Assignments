@@ -79,7 +79,8 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        raise NotImplementedError
+        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id)
+        return output_tokens.reshape(-1)[input_ids.shape[1]:]
         
     def random_sampling(
         self, 
@@ -101,7 +102,8 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        raise NotImplementedError
+        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, temperature=self.tau, do_sample=True)
+        return output_tokens.reshape(-1)[input_ids.shape[1]:]
     
     def topk_sampling(
         self, 
@@ -123,7 +125,8 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        raise NotImplementedError
+        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_k=self.k, do_sample=True)
+        return output_tokens.reshape(-1)[input_ids.shape[1]:]
     
     def nucleus_sampling(
         self, 
@@ -145,4 +148,6 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        raise NotImplementedError
+        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_p=self.p, do_sample=True)
+        # output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_p=self.p, top_k=self.k, do_sample=True)
+        return output_tokens.reshape(-1)[input_ids.shape[1]:]

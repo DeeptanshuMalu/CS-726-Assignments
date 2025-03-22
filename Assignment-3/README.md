@@ -14,6 +14,10 @@ git clone https://github.com/Darshan7575/Medusa.git
 cd Medusa
 pip install -e .
 ```
+[Only for gpu1.cse users] Fall back to slightly older cuda versions:
+```bash
+conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1  pytorch-cuda=11.8 -c pytorch -c nvidia
+``` 
 4. Creating Huggingface access token: Finally, you need to create huggingface token to access the model weights and dataset. Follow these instructions: https://huggingface.co/docs/hub/en/security-tokens
 
 
@@ -43,7 +47,7 @@ CUDA_VISIBLE_DEVICES=0 python task0.py --hf-token "<your_hf_token>" --decoding-s
 CUDA_VISIBLE_DEVICES=0 python task0.py --hf-token "<your_hf_token>" --decoding-strategy "topk" --k <k value>
 ```
 
-4. Nucleus Sampling: Follow the same steps as above, but with additional arguments
+4. **Nucleus Sampling**: Follow the same steps as above, but with additional arguments
 ```bash
 CUDA_VISIBLE_DEVICES=0 python task0.py --hf-token "<your_hf_token>" --decoding-strategy "nucleus" --p <p value>
 ```

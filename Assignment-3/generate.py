@@ -79,8 +79,15 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id)
-        return output_tokens.reshape(-1)[input_ids.shape[1]:]
+        input_len = input_ids.shape[1]
+        for _ in range(self.max_output_len):
+            last_logits = self.model(input_ids).logits[:, -1, :]
+            probs = torch.softmax(last_logits, dim=-1)
+            next_token_id = torch.argmax(probs, dim=-1, keepdim=True)
+            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+            if next_token_id.item() == self.eos_token_id:
+                break
+        return input_ids.reshape(-1)[input_len:]
         
     def random_sampling(
         self, 
@@ -102,8 +109,15 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, temperature=self.tau, do_sample=True)
-        return output_tokens.reshape(-1)[input_ids.shape[1]:]
+        input_len = input_ids.shape[1]
+        for _ in range(self.max_output_len):
+            last_logits = self.model(input_ids).logits[:, -1, :]
+            probs = torch.softmax(last_logits / self.tau, dim=-1)
+            next_token_id = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+            if next_token_id.item() == self.eos_token_id:
+                break
+        return input_ids.reshape(-1)[input_len:]
     
     def topk_sampling(
         self, 
@@ -125,8 +139,21 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_k=self.k, do_sample=True)
-        return output_tokens.reshape(-1)[input_ids.shape[1]:]
+        input_len = input_ids.shape[1]
+        for _ in range(self.max_output_len):
+            last_logits = self.model(input_ids).logits[:, -1, :]
+            probs = torch.softmax(last_logits, dim=-1)
+            sorted_probs, indices = torch.sort(probs, descending=True)
+            sorted_probs = sorted_probs.squeeze(0)
+            indices = indices.squeeze(0)
+            sorted_indices = indices[:self.k]
+            re_norm_probs = sorted_probs[:self.k] / sorted_probs[:self.k].sum()
+            next_token_id = sorted_indices[torch.multinomial(re_norm_probs, num_samples=1)]
+            next_token_id = next_token_id.unsqueeze(0)
+            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+            if next_token_id.item() == self.eos_token_id:
+                break
+        return input_ids.reshape(-1)[input_len:]
     
     def nucleus_sampling(
         self, 
@@ -148,6 +175,20 @@ class TextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_p=self.p, do_sample=True)
-        # output_tokens = self.model.generate(input_ids, max_new_tokens=self.max_output_len, eos_token_id=self.eos_token_id, top_p=self.p, top_k=self.k, do_sample=True)
-        return output_tokens.reshape(-1)[input_ids.shape[1]:]
+        input_len = input_ids.shape[1]
+        for _ in range(self.max_output_len):
+            last_logits = self.model(input_ids).logits[:, -1, :]
+            probs = torch.softmax(last_logits, dim=-1)
+            sorted_probs, indices = torch.sort(probs, descending=True)
+            sorted_probs = sorted_probs.squeeze(0)
+            indices = indices.squeeze(0)
+            cumulative_probs = sorted_probs.cumsum(dim=-1)
+            idx = torch.where(cumulative_probs >= self.p)[0][0].item()
+            sorted_indices = indices[:idx + 1]
+            re_norm_probs = sorted_probs[:idx + 1] / sorted_probs[:idx + 1].sum()
+            next_token_id = sorted_indices[torch.multinomial(re_norm_probs, num_samples=1)]
+            next_token_id = next_token_id.unsqueeze(0)
+            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+            if next_token_id.item() == self.eos_token_id:
+                break
+        return input_ids.reshape(-1)[input_len:]

@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python task1.py --hf-token "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" --word-list word_lists.txt --debug True

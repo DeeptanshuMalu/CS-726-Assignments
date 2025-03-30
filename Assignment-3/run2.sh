@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python task2.py --hf-token "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" --decoding-strategy "single-head" --debug True

@@ -105,5 +105,49 @@ class MedusaTextGenerator:
                 tensor of shape (T,), where T <= self.max_output_len
         '''    
         # TODO:
-        raise NotImplementedError
+        
+        input_len = input_ids.shape[1]
+        output_length = 0
+        with torch.inference_mode():
+            while output_length < self.max_output_len:
+                medusa_logits, outputs, logits = self.model(input_ids, output_orig = True, medusa_forward = True)
+                last_logits = logits[0, -1, :]
+                last_medusa_logits = medusa_logits[:self.no_heads-1, 0, -1, :]
+                candidates = [input_ids[0]]
+                scores = torch.zeros(1)
             
+                for s in range(self.no_heads):
+                    if s==0:
+                        log_probs = torch.log_softmax(last_logits, dim=-1)
+                    else:
+                        log_probs = torch.log_softmax(last_medusa_logits[s - 1], dim=-1)
+                        
+                    new_candidates = []
+                    new_scores = []
+
+                    sorted_probs, sorted_indices = torch.sort(log_probs, descending=True)
+                    top_w_probs = sorted_probs[:self.beam_width]
+                    top_w_indices = sorted_indices[:self.beam_width]
+                    for c in range(len(candidates)):
+                        if candidates[c][-1] == self.eos_token_id:
+                            new_candidates.append(candidates[c])
+                            new_scores.append(scores[c])
+                            continue
+
+                        for i in range(self.beam_width):
+                            new_score = scores[c] + top_w_probs[i]
+                            new_candidate = torch.cat([candidates[c], top_w_indices[i].unsqueeze(0)], dim=-1)
+                            new_candidates.append(new_candidate)
+                            new_scores.append(new_score)
+
+                    scores, indices = torch.sort(torch.stack(new_scores), descending=True)
+                    candidates = [new_candidates[i] for i in indices[:self.beam_width]]
+                    scores = scores[:self.beam_width]
+
+                output_length = len(candidates[0]) - input_len
+                input_ids = candidates[0].unsqueeze(0)
+
+                if candidates[0][-1] == self.eos_token_id:
+                    break
+
+            return input_ids.reshape(-1)[input_len:input_len + output_length]

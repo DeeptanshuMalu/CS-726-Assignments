@@ -110,6 +110,7 @@ class MedusaTextGenerator:
         output_length = 0
         with torch.inference_mode():
             while output_length < self.max_output_len:
+                input_ids_len = input_ids.shape[1]
                 medusa_logits, outputs, logits = self.model(input_ids, output_orig = True, medusa_forward = True)
                 last_logits = logits[0, -1, :]
                 last_medusa_logits = medusa_logits[:self.no_heads-1, 0, -1, :]
@@ -144,10 +145,18 @@ class MedusaTextGenerator:
                     candidates = [new_candidates[i] for i in indices[:self.beam_width]]
                     scores = scores[:self.beam_width]
 
-                output_length = len(candidates[0]) - input_len
-                input_ids = candidates[0].unsqueeze(0)
+                cand_scores = []
+                for c in candidates:
+                    num_toks_generated = c.shape[0] - input_ids_len
+                    medusa_logits, outputs, logits = self.model(c[:-1].unsqueeze(0), output_orig = True, medusa_forward = True)
+                    log_probs = torch.log_softmax(logits, dim=-1)
+                    score = torch.sum(log_probs[0, range(-num_toks_generated, 0), c[-num_toks_generated:]])
+                    cand_scores.append(score)
 
-                if candidates[0][-1] == self.eos_token_id:
+                input_ids = candidates[torch.argmax(torch.tensor(cand_scores))].unsqueeze(0)
+                output_length = input_ids.shape[1] - input_len
+
+                if input_ids[0][-1] == self.eos_token_id:
                     break
 
             return input_ids.reshape(-1)[input_len:input_len + output_length]

@@ -8,7 +8,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import transformers
-from Medusa.medusa.model.medusa_model_new import MedusaModel
+from medusa.model.medusa_model_new import MedusaModel
 
 from generate_medusa import MedusaTextGenerator
 from task0 import set_seed, get_dataloader, clean_text

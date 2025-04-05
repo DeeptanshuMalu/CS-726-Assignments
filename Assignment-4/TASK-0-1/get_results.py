@@ -110,10 +110,11 @@ if __name__ == "__main__":
     # DO NOT MAKE ANY CHANGES ABOVE THIS LINE
     # Write your code for TASK 0 below
     # TASK 0: Initialize Model and load weights
-    DATASET_PATH = '/PATH/TO/TEST/DATASET'  # Path to the dataset file
+    DATASET_PATH = '../A4_test_data.pt'  # Path to the dataset file
     
-    model = 
+    model = EnergyRegressor(FEAT_DIM)
     # Load the model weights
+    model.load_state_dict(torch.load('../trained_model_weights.pth', map_location=DEVICE))
     
     
     

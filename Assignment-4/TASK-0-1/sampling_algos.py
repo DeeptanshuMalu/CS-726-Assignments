@@ -82,9 +82,16 @@ class Algo1_Sampler:
                 samples.append(X_prop)
             else:
                 samples.append(X_prev)
+            if i == self.burn_in-1:
+                end_burn_in = time()
         
         end_time = time()
-        return samples[self.burn_in+1:], end_time - start_time
+
+        print(f"Burn-in time: {end_burn_in - start_time:.2f} seconds")
+        print(f"Sampling time: {end_time - end_burn_in:.2f} seconds")
+        print(f"Total time: {end_time - start_time:.2f} seconds")
+
+        return samples[self.burn_in+1:]
 
 class Algo2_Sampler:
     def __init__(self, model, N=10000, burn_in=2000, tau=0.01):
@@ -107,10 +114,16 @@ class Algo2_Sampler:
             grad = torch.autograd.grad(energy, X_prev)[0]
             X_new = X_prev - self.tau/2 * grad + torch.sqrt(self.tau) * torch.randn_like(X_prev)
             samples.append(X_new)
+            if i == self.burn_in-1:
+                end_burn_in = time()
 
         end_time = time()
+
+        print(f"Burn-in time: {end_burn_in - start_time:.2f} seconds")
+        print(f"Sampling time: {end_time - end_burn_in:.2f} seconds")
+        print(f"Total time: {end_time - start_time:.2f} seconds")
             
-        return samples[self.burn_in+1:], end_time - start_time
+        return samples[self.burn_in+1:]
 
 
 # --- Main Execution ---
@@ -123,13 +136,11 @@ if __name__ == "__main__":
     tau = 0.01
 
     algo1 = Algo1_Sampler(model, N, burn_in, tau)
-    samples, time_diff = algo1.sample()
-    print(f"Sampling time 1: {time_diff:.2f} seconds")
+    samples = algo1.sample()
     gen_tsne_plot_sklearn(samples, dim=2, algo=1)
     gen_tsne_plot_sklearn(samples, dim=3, algo=1)
 
     algo2 = Algo2_Sampler(model, N, burn_in, tau)
-    samples, time_diff = algo2.sample()
-    print(f"Sampling time 2: {time_diff:.2f} seconds")
+    samples = algo2.sample()
     gen_tsne_plot_sklearn(samples, dim=2, algo=2)
     gen_tsne_plot_sklearn(samples, dim=3, algo=2)

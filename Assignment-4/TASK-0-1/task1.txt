@@ -1,7 +1,11 @@
+10000 samples
+
 Algo 1
-10.06 seconds (1000 samples)
-89.03 seconds (10000 samples)
+Burn-in time: 19.37 seconds
+Sampling time: 71.23 seconds
+Total time: 90.60 seconds
 
 Algo 2
-5.45 seconds (1000 samples)
-44.25 seconds (10000 samples)
+Burn-in time: 8.19 seconds
+Sampling time: 32.53 seconds
+Total time: 40.72 seconds

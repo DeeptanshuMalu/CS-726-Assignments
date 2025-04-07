@@ -113,7 +113,7 @@ def plot_graph(x1_grid, x2_grid, z_values, x_train, title, filename):
     plt.figure(figsize=(10, 8))
     plt.contourf(x1_grid, x2_grid, z_values, levels=50, cmap='viridis')
     plt.colorbar(label='Function Value')
-    plt.scatter(x_train[:, 0], x_train[:, 1], c='red', s=30, label='Sample Points', marker='x')
+    plt.scatter(x_train[:, 0], x_train[:, 1], c='red', s=100, label='Sample Points', marker='x')
     plt.title(title)
     plt.xlabel('x1')
     plt.ylabel('x2')

@@ -99,6 +99,8 @@ Loss: 288.1554
     \label{fig:tsne}
 \end{figure}
 
+\newpage
+
 \section{Task 2}
 
 n is the number of samples taken from the Branin-Hoo function.
@@ -291,15 +293,15 @@ n is the number of samples taken from the Branin-Hoo function.
 
     \item \textbf{Kernel Behavior:}
     \begin{itemize}
-        \item \textbf{RBF Kernel:} Produces smooth, globally consistent approximations. Performs well across all $n$.
-        \item \textbf{Matern Kernel:} Shows more localized variations; slower to converge but captures fine-grained features.
-        \item \textbf{Rational Quadratic Kernel:} Balances smoothness and local adaptability. Strong performance even at low $n$.
+        \item \textbf{RBF Kernel:} GP mean is good only for higher $n$. GP standard deviation is high for lower $n$, but decreases with more samples.
+        \item \textbf{Matern Kernel:} GP mean is good for all $n$. GP standard deviation is high for lower $n$, but decreases with more samples.
+        \item \textbf{Rational Quadratic Kernel:} GP mean is good for all $n$. GP standard deviation is high for lower $n$, but decreases with more samples. The standard deviation is lower than the Matern kernel.
     \end{itemize}
 
     \item \textbf{Uncertainty Patterns:}
     \begin{itemize}
         \item Higher uncertainty (GP std dev) is seen at the edges or unsampled regions.
-        \item These areas shrink as $n$ increases, particularly with EI-based acquisition.
+        \item These areas shrink as $n$ increases.
     \end{itemize}
 \end{enumerate}
 
@@ -308,20 +310,21 @@ n is the number of samples taken from the Branin-Hoo function.
 \begin{itemize}
     \item \textbf{Deeptanshu Malu}:
     \begin{enumerate}
-        \item Formulated the trie data structure design for Task 1.
-        \item Coded the multi head decoding algorithm for Task 2.
+        \item Did Task 0.
+        \item Implemented Task 1.
+        \item Implemented Task 2 (Kernels and acquisition functions).
     \end{enumerate}
 
     \item \textbf{Deevyanshu Malu}:
     \begin{enumerate}
-        \item Coded the trie data structure and the constrained decoding algorithm for Task 1.
-        \item Coded the multi head decoding algorithm for Task 2.
+        \item Did Task 0.
+        \item Debugged the code for Task 1.
+        \item Implemented Task 2 (Hyperparameter optimization and GP).
     \end{enumerate}
 
     \item \textbf{Neel Rambhia}:
     \begin{enumerate}
-        \item Completed all decoding algorithms in Task 0.
-        \item Coded the single head decoding algorithm for Task 2.
+        \item No contribution.
     \end{enumerate}
 \end{itemize}
 
@@ -329,7 +332,7 @@ n is the number of samples taken from the Branin-Hoo function.
 
 \begin{itemize}
     \item We have also used Copilot for faster coding and not for direct logic.
-    \item Used ChatGPT to generate the trie data structure but filled in the logic ourselves.
+    \item Used ChatGPT to learn how to implement the GP and how to implement it to be faster than normal matrix multiplication.
 \end{itemize}
 
 

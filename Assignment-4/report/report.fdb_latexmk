@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1744259122.54841 "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-4/report/report.tex" "report.pdf" "report" 1744259129.08461 0
+["pdflatex"] 1744376241.99494 "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-4/report/report.tex" "report.pdf" "report" 1744376251.50162 0
   "../TASK-0-1/tsne_plot_sklearn_2d_1.png" 1744043941 54939 2624cf25a2f600129df263ebbab2e95c ""
   "../TASK-0-1/tsne_plot_sklearn_2d_2.png" 1744043941 54708 b6cb8e22417b813536ed45012425879d ""
   "../TASK-0-1/tsne_plot_sklearn_3d_1.png" 1744043941 170237 9bd5679b71b9e56190a2c2b19c221138 ""
@@ -170,10 +170,10 @@
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/rerunfilecheck/rerunfilecheck.sty" 1657800696 9714 ba3194bd52c8499b3f1e3eb91d409670 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/tools/longtable.sty" 1700599895 12935 94a3291359b5f73ff1b19345a6983105 ""
   "C:/Users/deept/AppData/Local/Programs/MiKTeX/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
-  "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-4/report/report.tex" 1744259115 16518 c06694cfda02115b04c4f34efeadd591 ""
-  "report.aux" 1744259128 3749 9036e1124fcd749b9c3df28b66aaf31a "pdflatex"
-  "report.out" 1744259128 228 7c4920d3c2264c6888632b8d8eb890f7 "pdflatex"
-  "report.tex" 1744259115 16518 c06694cfda02115b04c4f34efeadd591 ""
+  "d:/03 My Study Area/6th Semester/CS-726/Programming HW/Assignment-4/report/report.tex" 1744376237 16540 446b04aceb4beb48e66d4d5986ff02bb ""
+  "report.aux" 1744376251 3749 055d962f21fce011ae12ebfa3988a665 "pdflatex"
+  "report.out" 1744376251 228 7c4920d3c2264c6888632b8d8eb890f7 "pdflatex"
+  "report.tex" 1744376237 16540 446b04aceb4beb48e66d4d5986ff02bb ""
   (generated)
   "report.aux"
   "report.log"

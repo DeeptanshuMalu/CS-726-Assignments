@@ -28,14 +28,11 @@ def gen_tsne_plot_sklearn(samples, dim=2, algo=1):
     if dim not in [2, 3]:
         raise ValueError("Dimension must be 2 or 3")
     
-    # Convert list of tensors to a single tensor and move to CPU
     samples_tensor = torch.cat(samples, dim=0).cpu().numpy()
     
-    # Apply t-SNE using sklearn
-    tsne = TSNE(n_components=dim, perplexity=30, n_iter=1000, random_state=SEED)
+    tsne = TSNE(n_components=dim, random_state=SEED)
     samples_nd = tsne.fit_transform(samples_tensor)
     
-    # Plotting
     if dim == 2:
         plt.figure(figsize=(8, 6))
         plt.scatter(samples_nd[:, 0], samples_nd[:, 1], s=5)
